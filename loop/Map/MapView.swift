@@ -18,19 +18,22 @@ struct MapView: View {
     }
 
     private var topBar: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Ruta Python")
-                    .font(LoopFont.black(24))
-                    .foregroundColor(.textPrimary)
-                Text("Modulo actual: Bucles")
-                    .font(LoopFont.regular(12))
-                    .foregroundColor(.textSecond)
+        ViewThatFits(in: .vertical) {
+            HStack(alignment: .center) {
+                routeHeader
+                Spacer()
+                VStack(spacing: Spacing.sm) {
+                    ChipView(icon: "flame.fill", text: "12", tint: .loopGold)
+                    ChipView(icon: "heart.fill", text: "4", tint: .coral)
+                }
             }
-            Spacer()
-            VStack(spacing: Spacing.sm) {
-                ChipView(icon: "flame.fill", text: "12", tint: .loopGold)
-                ChipView(icon: "heart.fill", text: "4", tint: .coral)
+
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                routeHeader
+                HStack(spacing: Spacing.sm) {
+                    ChipView(icon: "flame.fill", text: "12", tint: .loopGold)
+                    ChipView(icon: "heart.fill", text: "4", tint: .coral)
+                }
             }
         }
     }
@@ -68,6 +71,9 @@ struct MapView: View {
                         Text(concept.title)
                             .font(LoopFont.semiBold(12))
                             .foregroundColor(.textSecond)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(width: 84)
                         if concept.state == .current {
                             Text("AQUI")
                                 .font(LoopFont.bold(9))
@@ -91,5 +97,18 @@ struct MapView: View {
             CGPoint(x: 100, y: 516),
         ]
         return points[min(index, points.count - 1)]
+    }
+
+    private var routeHeader: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Ruta Python")
+                .font(LoopFont.black(24))
+                .foregroundColor(.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Modulo actual: Bucles")
+                .font(LoopFont.regular(12))
+                .foregroundColor(.textSecond)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

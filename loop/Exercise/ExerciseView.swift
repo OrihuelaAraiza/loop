@@ -17,6 +17,7 @@ struct ExerciseView: View {
                     Text(viewModel.exercise.question)
                         .font(LoopFont.bold(19))
                         .foregroundColor(.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -71,7 +72,10 @@ struct ExerciseView: View {
                     Text(option)
                         .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .foregroundColor(.textPrimary)
-                        .frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, minHeight: 56)
+                        .padding(.horizontal, Spacing.sm)
                         .padding(.vertical, 12)
                         .background(Color.loopSurf2)
                         .clipShape(RoundedRectangle(cornerRadius: Radius.md))
@@ -104,6 +108,7 @@ struct ExerciseView: View {
                         Text(viewModel.exercise.explanation)
                             .font(LoopFont.regular(12))
                             .foregroundColor(.textSecond)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }

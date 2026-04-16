@@ -32,6 +32,7 @@ struct LoopyBubbleView: View {
             .font(LoopFont.semiBold(16))
             .foregroundStyle(Color.textPrimary)
             .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.vertical, 14)
             .padding(.horizontal, 16)
             .background(

@@ -8,6 +8,17 @@ enum AgeRange: String, Codable, CaseIterable, Identifiable {
     case age23to28 = "23-28"
     case age29Plus = "29+"
     var id: String { rawValue }
+
+    static func from(age: Int) -> AgeRange {
+        switch age {
+        case 4 ... 12: return .age10to12
+        case 13 ... 15: return .age13to15
+        case 16 ... 18: return .age16to18
+        case 19 ... 22: return .age19to22
+        case 23 ... 28: return .age23to28
+        default: return .age29Plus
+        }
+    }
 }
 
 enum LearningGoal: String, Codable, CaseIterable, Identifiable {
@@ -41,6 +52,11 @@ enum ProgrammingLanguage: String, Codable, CaseIterable, Identifiable {
 struct UserProfile: Codable {
     var name: String = ""
     var avatarIndex: Int = 0
+    var age: Int = 17 {
+        didSet {
+            ageRange = AgeRange.from(age: age)
+        }
+    }
     var ageRange: AgeRange = .age16to18
     var goal: LearningGoal = .createApps
     var knowledgeLevel: Level = .zero

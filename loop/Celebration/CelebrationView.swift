@@ -18,6 +18,8 @@ struct CelebrationView: View {
                     Text("Leccion completada")
                         .font(LoopFont.black(28))
                         .foregroundColor(.textPrimary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     ChipView(icon: "star.fill", text: "+\(viewModel.xpGained) XP", tint: .amethyst)
 
@@ -39,7 +41,10 @@ struct CelebrationView: View {
                     Text(badge)
                         .font(LoopFont.semiBold(13))
                         .foregroundColor(idx < 2 ? .textPrimary : .textMuted)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .center)
+                        .frame(minHeight: 40)
                         .padding(.vertical, Spacing.sm)
                 }
                 .opacity(idx < 2 ? 1 : 0.45)

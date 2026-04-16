@@ -7,35 +7,32 @@ struct ProgressMetricCard: View {
     let tint: Color
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            RoundedRectangle(cornerRadius: Radius.lg)
-                .fill(Color.loopSurf2.opacity(0.85))
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radius.lg)
-                        .stroke(Color.borderSoft, lineWidth: 1)
-                )
+        LoopCard(accentColor: tint, showsSceneAccent: true, usesGlassSurface: true) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(LoopFont.semiBold(13))
+                        .foregroundColor(.textSecond)
+                    Text(value)
+                        .font(LoopFont.black(32))
+                        .foregroundColor(.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                }
 
-            Circle()
-                .fill(tint.opacity(0.14))
-                .frame(width: 32, height: 32)
-                .overlay(
-                    Image(systemName: icon)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(tint)
-                )
-                .padding(Spacing.md)
+                Spacer(minLength: Spacing.md)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(LoopFont.semiBold(13))
-                    .foregroundColor(.textSecond)
-                Text(value)
-                    .font(LoopFont.black(34))
-                    .foregroundColor(.textPrimary)
+                Circle()
+                    .fill(tint.opacity(0.14))
+                    .frame(width: 34, height: 34)
+                    .overlay(
+                        Image(systemName: icon)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(tint)
+                    )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Spacing.lg)
         }
-        .frame(height: 138)
+        .frame(minHeight: 132)
     }
 }
