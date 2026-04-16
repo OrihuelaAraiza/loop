@@ -1,0 +1,24 @@
+{
+  "originHash" : "be8a7fa33310803b93d6aea29b281b51e3f30eda6f20e7b08a996899e986ee18",
+  "pins" : [
+    {
+      "identity" : "highlightswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/appstefan/HighlightSwift",
+      "state" : {
+        "revision" : "784ca3ccfc8a2cf724fbb2f06cb6ec3329424da3",
+        "version" : "1.1.0"
+      }
+    },
+    {
+      "identity" : "lottie-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/airbnb/lottie-ios",
+      "state" : {
+        "revision" : "0cb03fd7564d27345bcd96144b811e56212949c6",
+        "version" : "4.6.0"
+      }
+    }
+  ],
+  "version" : 3
+}
