@@ -1,114 +1,165 @@
-//
-//  LoopyRobotView.swift
-//  loop
-//
-//  Loopy: robot geométrico con Path y formas (sin assets externos).
-//
-
 import SwiftUI
 
-struct LoopyRobotView: View {
+struct LoopyView: View {
     var mood: LoopyMood = .idle
+    @State private var bob = false
 
     var body: some View {
         ZStack {
-            // Aura suave
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(LoopPalette.amethyst.opacity(0.22))
-                .frame(width: 132, height: 156)
+            RoundedRectangle(cornerRadius: Radius.xl)
+                .fill(Color.amethyst.opacity(0.15))
+                .frame(width: 170, height: 190)
 
             VStack(spacing: 0) {
-                antennas
-                head
-                torso
-            }
-            .padding(.vertical, 10)
-        }
-        .frame(width: 132, height: 168)
-        .accessibilityLabel("Loopy, mascota de Loop")
-    }
+                antenna
+                ZStack {
+                    RoundedRectangle(cornerRadius: Radius.xl)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.amethyst, Color.cerulean],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 118, height: 94)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radius.xl)
+                                .stroke(Color.periwinkle.opacity(0.35), lineWidth: 1)
+                        )
 
-    private var antennas: some View {
-        HStack(spacing: 56) {
-            antenna(side: -1)
-            antenna(side: 1)
-        }
-        .offset(y: 6)
-    }
+                    HStack(spacing: 16) {
+                        robotEye
+                        robotEye
+                    }
+                    .scaleEffect(mood == .speaking ? 1.08 : 1)
+                    .offset(y: -6)
 
-    private func antenna(side: CGFloat) -> some View {
-        ZStack(alignment: .bottom) {
-            Capsule()
-                .fill(LoopPalette.periwinkle.opacity(0.85))
-                .frame(width: 5, height: 22)
-            Circle()
-                .fill(LoopPalette.coral.opacity(mood == .idle ? 0.9 : 1))
-                .frame(width: 10, height: 10)
-                .offset(y: -20)
-        }
-        .offset(x: side * 26)
-    }
+                    mouth
+                        .offset(y: 20)
+                }
 
-    private var head: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(LoopPalette.amethyst)
-                .frame(width: 88, height: 72)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(LoopPalette.periwinkle.opacity(0.35), lineWidth: 1)
-                )
-
-            HStack(spacing: 18) {
-                eye
-                eye
-            }
-            .offset(y: -4)
-
-            // Boca tipo panel
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(LoopPalette.cerulean)
-                .frame(width: 36, height: 8)
-                .offset(y: 18)
-        }
-    }
-
-    private var eye: some View {
-        ZStack {
-            Circle()
-                .fill(LoopPalette.baseBackground.opacity(0.9))
-                .frame(width: 18, height: 18)
-            Circle()
-                .fill(LoopPalette.periwinkle)
-                .frame(width: 8, height: 8)
-        }
-    }
-
-    private var torso: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [LoopPalette.cerulean, LoopPalette.amethyst.opacity(0.85)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                RoundedRectangle(cornerRadius: Radius.lg)
+                    .fill(Color.loopSurf3.opacity(0.6))
+                    .frame(width: 124, height: 74)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radius.lg)
+                            .stroke(Color.borderMid, lineWidth: 1)
                     )
-                )
-                .frame(width: 96, height: 62)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(LoopPalette.periwinkle.opacity(0.3), lineWidth: 1)
-                )
-
-            // Panel pecho
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(LoopPalette.baseBackground.opacity(0.35))
-                .frame(width: 52, height: 28)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(LoopPalette.mint.opacity(0.5), lineWidth: 1)
-                )
+                    .overlay(alignment: .center) {
+                        RoundedRectangle(cornerRadius: Radius.sm)
+                            .fill(Color.mint.opacity(0.25))
+                            .frame(width: 62, height: 28)
+                    }
+                    .overlay(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: Radius.sm)
+                            .fill(Color.amethyst.opacity(0.9))
+                            .frame(width: 14, height: 48)
+                            .offset(x: -16)
+                    }
+                    .overlay(alignment: .trailing) {
+                        RoundedRectangle(cornerRadius: Radius.sm)
+                            .fill(Color.amethyst.opacity(0.9))
+                            .frame(width: 14, height: 48)
+                            .offset(x: 16)
+                    }
+                    .padding(.top, 8)
+            }
         }
-        .padding(.top, 6)
+        .offset(y: bob ? -2 : 2)
+        .shadow(color: Color.amethyst.opacity(0.18), radius: bob ? 14 : 8, y: 8)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
+                bob.toggle()
+            }
+        }
+        .animation(.spring(response: 0.4), value: mood)
+    }
+
+    private var antenna: some View {
+        ZStack {
+            Rectangle()
+                .fill(Color.periwinkle.opacity(0.85))
+                .frame(width: 6, height: 26)
+            Circle()
+                .fill(Color.coral)
+                .frame(width: 14, height: 14)
+                .offset(y: -16)
+        }
+        .rotationEffect(.degrees(mood == .celebrating ? 15 : 0))
+        .offset(y: 10)
+    }
+
+    private var robotEye: some View {
+        ZStack {
+            Circle().fill(.white).frame(width: 24, height: 24)
+            Circle().fill(Color.amethyst).frame(width: 13, height: 13)
+            Circle().fill(.white).frame(width: 5, height: 5)
+        }
+        .overlay(eyelid)
+    }
+
+    @ViewBuilder
+    private var eyelid: some View {
+        switch mood {
+        case .celebrating:
+            Capsule()
+                .stroke(Color.loopBG, lineWidth: 2)
+                .frame(width: 16, height: 7)
+                .offset(y: -4)
+        case .sad:
+            Rectangle()
+                .fill(Color.loopBG.opacity(0.6))
+                .frame(width: 16, height: 3)
+                .rotationEffect(.degrees(12))
+                .offset(x: 2, y: -6)
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private var mouth: some View {
+        switch mood {
+        case .idle:
+            RoundedRectangle(cornerRadius: 3)
+                .fill(.white)
+                .frame(width: 34, height: 6)
+        case .speaking:
+            Capsule()
+                .fill(.white)
+                .frame(width: 28, height: 10)
+        case .celebrating:
+            SmileShape()
+                .stroke(.white, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .frame(width: 30, height: 18)
+        case .sad:
+            SadMouthShape()
+                .stroke(.white, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .frame(width: 30, height: 18)
+        }
+    }
+}
+
+private struct SmileShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX + 3, y: rect.midY - 2))
+        p.addQuadCurve(
+            to: CGPoint(x: rect.maxX - 3, y: rect.midY - 2),
+            control: CGPoint(x: rect.midX, y: rect.maxY)
+        )
+        return p
+    }
+}
+
+private struct SadMouthShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX + 3, y: rect.midY + 4))
+        p.addQuadCurve(
+            to: CGPoint(x: rect.maxX - 3, y: rect.midY + 4),
+            control: CGPoint(x: rect.midX, y: rect.minY - 3)
+        )
+        return p
     }
 }

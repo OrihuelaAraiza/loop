@@ -7,9 +7,9 @@
 
 import Foundation
 
-/// Estado visual de Loopy (idle / hablando / celebrando).
 enum LoopyMood: String, CaseIterable {
     case idle
     case speaking
     case celebrating
+    case sad
 }

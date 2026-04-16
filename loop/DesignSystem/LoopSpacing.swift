@@ -1,18 +1,11 @@
-//
-//  LoopSpacing.swift
-//  loop
-//
-//  Espaciados y radios consistentes.
-//
-
 import CoreGraphics
 
-enum LoopSpacing {
-    static let screenHorizontal: CGFloat = 20
-    static let section: CGFloat = 20
-    static let cardGap: CGFloat = 12
-    static let cardPadding: CGFloat = 16
-    static let cardCornerRadius: CGFloat = 18
-    static let buttonCornerRadius: CGFloat = 16
-    static let bubbleCornerRadius: CGFloat = 20
+enum Spacing {
+    static let xs: CGFloat = 4
+    static let sm: CGFloat = 8
+    static let md: CGFloat = 12
+    static let lg: CGFloat = 16
+    static let xl: CGFloat = 20
+    static let xxl: CGFloat = 24
+    static let section: CGFloat = 32
 }

@@ -1,30 +1,9 @@
-//
-//  LoopFont.swift
-//  loop
-//
-//  Tipografía Nunito (400 / 600 / 700 / 800 / 900).
-//
-
 import SwiftUI
 
-enum LoopFont {
-    /// Nombres PostScript de los TTF embebidos (Google Fonts static).
-    private static let regular = "Nunito-Regular"
-    private static let semiBold = "Nunito-SemiBold"
-    private static let bold = "Nunito-Bold"
-    private static let extraBold = "Nunito-ExtraBold"
-    private static let black = "Nunito-Black"
-
-    /// Fuente Nunito por peso lógico de SwiftUI.
-    static func nunito(_ weight: Font.Weight, size: CGFloat, relativeTo textStyle: Font.TextStyle = .body) -> Font {
-        let psName: String
-        switch weight {
-        case .semibold: psName = semiBold
-        case .bold: psName = bold
-        case .heavy: psName = extraBold
-        case .black: psName = black
-        default: psName = regular
-        }
-        return Font.custom(psName, size: size, relativeTo: textStyle)
-    }
+struct LoopFont {
+    static func black(_ size: CGFloat) -> Font { .custom("Nunito-Black", size: size) }
+    static func bold(_ size: CGFloat) -> Font { .custom("Nunito-Bold", size: size) }
+    static func semiBold(_ size: CGFloat) -> Font { .custom("Nunito-SemiBold", size: size) }
+    static func medium(_ size: CGFloat) -> Font { .custom("Nunito-Medium", size: size) }
+    static func regular(_ size: CGFloat) -> Font { .custom("Nunito-Regular", size: size) }
 }

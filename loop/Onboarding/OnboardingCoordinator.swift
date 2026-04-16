@@ -1,28 +1,23 @@
-//
-//  OnboardingCoordinator.swift
-//  loop
-//
-//  Estado del flujo de onboarding (7 pasos).
-//
-
 import Foundation
-import Observation
+import Combine
 
-@Observable
-@MainActor
-final class OnboardingCoordinator {
-    /// Paso visible 1...7
-    var step: Int = 1
-    /// Datos del usuario; se irá llenando en pasos siguientes.
-    var profile = UserLearningProfile()
+final class OnboardingViewModel: ObservableObject {
+    @Published var step: Int = 0
+    @Published var userProfile = UserProfile()
+    @Published var wantsPlacementTest = false
+    @Published var placementScore = 0
 
-    func goToNextStep() {
-        guard step < 7 else { return }
-        step += 1
+    let totalSteps = 7
+
+    func next() {
+        if step < totalSteps - 1 { step += 1 }
     }
 
-    func goToPreviousStep() {
-        guard step > 1 else { return }
-        step -= 1
+    func previous() {
+        if step > 0 { step -= 1 }
+    }
+
+    func generatePlan() {
+        userProfile.generatedPlan = PlanGenerator.generatePlan(from: userProfile)
     }
 }

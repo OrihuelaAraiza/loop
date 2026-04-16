@@ -1,42 +1,36 @@
-//
-//  LoopColor.swift
-//  loop
-//
-//  Tokens de color de Loop (hackathon Human-Centered AI).
-//
-
 import SwiftUI
 
-/// Paleta fija de la marca. Las vistas deben usar `Color.loop*` o estos estáticos, sin literales sueltos.
-enum LoopPalette {
-    /// Prussian Blue — fondo de pantallas y headers
-    static let prussian = Color(red: 25 / 255, green: 29 / 255, blue: 50 / 255)
-    /// Coral — acción primaria
-    static let coral = Color(red: 238 / 255, green: 99 / 255, blue: 82 / 255)
-    /// Periwinkle — texto UI, chips, bordes
-    static let periwinkle = Color(red: 173 / 255, green: 189 / 255, blue: 255 / 255)
-    /// Cerulean — barras de progreso de ruta
-    static let cerulean = Color(red: 28 / 255, green: 110 / 255, blue: 140 / 255)
-    /// Amethyst — XP, logros, Loopy
-    static let amethyst = Color(red: 150 / 255, green: 73 / 255, blue: 203 / 255)
-    /// Gold — streaks, estrellas, días completados
-    static let gold = Color(red: 244 / 255, green: 185 / 255, blue: 66 / 255)
-    /// Mint — correcto, nodos completados
-    static let mint = Color(red: 78 / 255, green: 203 / 255, blue: 165 / 255)
-    /// Fondo base oscuro global
-    static let baseBackground = Color(red: 15 / 255, green: 18 / 255, blue: 33 / 255)
-    /// Cards: rgba(36,40,68,0.9)
-    static let cardFill = Color(red: 36 / 255, green: 40 / 255, blue: 68 / 255).opacity(0.9)
-}
-
 extension Color {
-    static let loopPrussian = LoopPalette.prussian
-    static let loopCoral = LoopPalette.coral
-    static let loopPeriwinkle = LoopPalette.periwinkle
-    static let loopCerulean = LoopPalette.cerulean
-    static let loopAmethyst = LoopPalette.amethyst
-    static let loopGold = LoopPalette.gold
-    static let loopMint = LoopPalette.mint
-    static let loopBaseBackground = LoopPalette.baseBackground
-    static let loopCardFill = LoopPalette.cardFill
+    // Backgrounds (3 niveles de profundidad)
+    static let loopBG = Color(hex: "0D1020")
+    static let loopSurf1 = Color(hex: "131628")
+    static let loopSurf2 = Color(hex: "1A1E35")
+    static let loopSurf3 = Color(hex: "222640")
+
+    // Paleta de acento
+    static let coral = Color(hex: "EE6352")
+    static let periwinkle = Color(hex: "ADBDFF")
+    static let cerulean = Color(hex: "1C6E8C")
+    static let amethyst = Color(hex: "9649CB")
+    static let loopGold = Color(hex: "F4B942")
+    static let mint = Color(hex: "4ECBA5")
+
+    // Texto
+    static let textPrimary = Color(hex: "EEF0FF")
+    static let textSecond = Color(hex: "ADBDFF").opacity(0.65)
+    static let textMuted = Color(hex: "ADBDFF").opacity(0.35)
+
+    // Bordes
+    static let borderSoft = Color(hex: "ADBDFF").opacity(0.08)
+    static let borderMid = Color(hex: "ADBDFF").opacity(0.16)
+
+    init(hex: String) {
+        let sanitized = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: sanitized).scanHexInt64(&int)
+        let r = Double((int >> 16) & 0xFF) / 255
+        let g = Double((int >> 8) & 0xFF) / 255
+        let b = Double(int & 0xFF) / 255
+        self.init(red: r, green: g, blue: b)
+    }
 }

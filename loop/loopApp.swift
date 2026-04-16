@@ -9,9 +9,17 @@ import SwiftUI
 
 @main
 struct loopApp: App {
+    @StateObject private var appState = AppState()
+
     var body: some Scene {
         WindowGroup {
-            OnboardingView()
+            if appState.hasCompletedOnboarding {
+                MainTabView()
+                    .environmentObject(appState)
+            } else {
+                OnboardingFlow()
+                    .environmentObject(appState)
+            }
         }
     }
 }

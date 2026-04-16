@@ -1,29 +1,45 @@
-//
-//  LoopPrimaryButton.swift
-//  loop
-//
-//  Botón CTA primario (Coral + sombra definida en el brief).
-//
-
 import SwiftUI
 
-struct LoopPrimaryButton: View {
+struct LoopCTA: View {
     let title: String
     let action: () -> Void
+    @State private var isPressed = false
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(LoopFont.nunito(.heavy, size: 18, relativeTo: .body))
-                .foregroundStyle(Color.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: LoopSpacing.buttonCornerRadius, style: .continuous)
-                        .fill(LoopPalette.coral)
-                        .shadow(color: LoopPalette.coral.opacity(0.3), radius: 16, y: 8)
-                )
+            HStack {
+                Text(title)
+                    .font(LoopFont.bold(15))
+                    .foregroundColor(.white)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: Radius.md)
+                        .fill(Color.coral)
+                    VStack {
+                        LinearGradient(
+                            colors: [.white.opacity(0.2), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 24)
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                        Spacer()
+                    }
+                }
+            )
+            .scaleEffect(isPressed ? 0.985 : 1)
+            .shadow(color: Color.coral.opacity(0.35), radius: isPressed ? 8 : 16, y: isPressed ? 3 : 6)
+            .shadow(color: Color.coral.opacity(0.18), radius: isPressed ? 10 : 22, y: 0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isPressed)
         }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in isPressed = true }
+                .onEnded { _ in isPressed = false }
+        )
         .buttonStyle(.plain)
     }
 }

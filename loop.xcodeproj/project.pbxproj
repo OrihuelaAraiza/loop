@@ -7,14 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		E80822242F90617300EB48F0 /* HighlightSwift in Frameworks */ = {
-			isa = PBXBuildFile;
-			productRef = E80822222F90617300EB48F0 /* HighlightSwift */;
-		};
-		E80822252F90617300EB48F0 /* Lottie in Frameworks */ = {
-			isa = PBXBuildFile;
-			productRef = E80822232F90617300EB48F0 /* Lottie */;
-		};
+		E80822242F90617300EB48F0 /* HighlightSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E80822222F90617300EB48F0 /* HighlightSwift */; };
+		E80822252F90617300EB48F0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = E80822232F90617300EB48F0 /* Lottie */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -419,7 +413,7 @@
 				DEVELOPMENT_TEAM = 9BY9RQP8PP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = loop/Info.plist;
+				INFOPLIST_FILE = "Supporting/Loop-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -452,7 +446,7 @@
 				DEVELOPMENT_TEAM = 9BY9RQP8PP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = loop/Info.plist;
+				INFOPLIST_FILE = "Supporting/Loop-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -561,38 +555,6 @@
 		};
 /* End XCBuildConfiguration section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		E80822202F90617300EB48F0 /* XCRemoteSwiftPackageReference "HighlightSwift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/appstefan/HighlightSwift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
-			};
-		};
-		E80822212F90617300EB48F0 /* XCRemoteSwiftPackageReference "lottie-ios" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/airbnb/lottie-ios";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 4.4.1;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		E80822222F90617300EB48F0 /* HighlightSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E80822202F90617300EB48F0 /* XCRemoteSwiftPackageReference "HighlightSwift" */;
-			productName = HighlightSwift;
-		};
-		E80822232F90617300EB48F0 /* Lottie */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E80822212F90617300EB48F0 /* XCRemoteSwiftPackageReference "lottie-ios" */;
-			productName = Lottie;
-		};
-/* End XCSwiftPackageProductDependency section */
-
 /* Begin XCConfigurationList section */
 		E80821E92F90617300EB48EF /* Build configuration list for PBXProject "loop" */ = {
 			isa = XCConfigurationList;
@@ -631,6 +593,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E80822202F90617300EB48F0 /* XCRemoteSwiftPackageReference "HighlightSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/appstefan/HighlightSwift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+		E80822212F90617300EB48F0 /* XCRemoteSwiftPackageReference "lottie-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/airbnb/lottie-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.4.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E80822222F90617300EB48F0 /* HighlightSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E80822202F90617300EB48F0 /* XCRemoteSwiftPackageReference "HighlightSwift" */;
+			productName = HighlightSwift;
+		};
+		E80822232F90617300EB48F0 /* Lottie */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E80822212F90617300EB48F0 /* XCRemoteSwiftPackageReference "lottie-ios" */;
+			productName = Lottie;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E80821E62F90617300EB48EF /* Project object */;
 }

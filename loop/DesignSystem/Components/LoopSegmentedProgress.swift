@@ -1,22 +1,14 @@
-//
-//  LoopSegmentedProgress.swift
-//  loop
-//
-//  Barra de progreso del onboarding (7 segmentos).
-//
-
 import SwiftUI
 
 struct LoopSegmentedProgress: View {
-    /// Paso actual 1...7
     let currentStep: Int
-    let totalSteps: Int = 7
+    let totalSteps: Int
 
     var body: some View {
         HStack(spacing: 6) {
-            ForEach(1 ... totalSteps, id: \.self) { index in
+            ForEach(0 ..< totalSteps, id: \.self) { index in
                 Capsule()
-                    .fill(index <= currentStep ? LoopPalette.coral : LoopPalette.periwinkle.opacity(0.25))
+                    .fill(index <= currentStep ? Color.coral : Color.borderSoft)
                     .frame(height: 6)
             }
         }

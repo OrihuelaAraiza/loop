@@ -19,27 +19,27 @@ struct LoopyBubbleView: View {
 
     private var tail: some View {
         BubbleTailShape()
-            .fill(LoopPalette.cardFill)
+            .fill(Color.loopSurf2.opacity(0.9))
             .frame(width: 12, height: 22)
             .overlay(
                 BubbleTailShape()
-                    .stroke(LoopPalette.periwinkle.opacity(0.35), lineWidth: 1)
+                    .stroke(Color.borderMid, lineWidth: 1)
             )
     }
 
     private var bubbleText: some View {
         Text(text)
-            .font(LoopFont.nunito(.semibold, size: 16, relativeTo: .body))
-            .foregroundStyle(LoopPalette.periwinkle)
+            .font(LoopFont.semiBold(16))
+            .foregroundStyle(Color.textPrimary)
             .multilineTextAlignment(.leading)
             .padding(.vertical, 14)
             .padding(.horizontal, 16)
             .background(
-                RoundedRectangle(cornerRadius: LoopSpacing.bubbleCornerRadius, style: .continuous)
-                    .fill(LoopPalette.cardFill)
+                RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                    .fill(Color.loopSurf2.opacity(0.9))
                     .overlay(
-                        RoundedRectangle(cornerRadius: LoopSpacing.bubbleCornerRadius, style: .continuous)
-                            .stroke(LoopPalette.periwinkle.opacity(0.35), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                            .stroke(Color.borderMid, lineWidth: 1)
                     )
             )
     }
