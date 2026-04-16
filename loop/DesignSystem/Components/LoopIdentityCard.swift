@@ -13,8 +13,8 @@ private final class LoopTiltMotionManager: ObservableObject {
         motionManager.deviceMotionUpdateInterval = 1 / 45
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
             guard let self, let motion else { return }
-            self.pitch = max(min(motion.attitude.pitch * 0.9, 0.5), -0.5)
-            self.roll = max(min(motion.attitude.roll * 0.9, 0.5), -0.5)
+            self.pitch = max(min(motion.attitude.pitch * 0.8, 0.45), -0.45)
+            self.roll = max(min(motion.attitude.roll * 0.8, 0.45), -0.45)
         }
     }
 
@@ -26,6 +26,8 @@ private final class LoopTiltMotionManager: ObservableObject {
 struct LoopIdentityCard: View {
     let userProfile: UserProfile
     let gameState: GameState
+    var isCustomizerPresented = false
+    var onCustomize: () -> Void = {}
 
     @StateObject private var motion = LoopTiltMotionManager()
     @State private var isFlipped = false
@@ -43,73 +45,58 @@ struct LoopIdentityCard: View {
                 .rotation3DEffect(.degrees(isFlipped ? 0 : -180), axis: (x: 0, y: 1, z: 0))
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 260)
-        .rotation3DEffect(.degrees(-motion.pitch * 12), axis: (x: 1, y: 0, z: 0))
-        .rotation3DEffect(.degrees(motion.roll * 16), axis: (x: 0, y: 1, z: 0))
-        .shadow(color: accent.opacity(0.22), radius: 24, y: 16)
-        .shadow(color: .black.opacity(0.18), radius: 32, y: 18)
+        .frame(height: 248)
+        .rotation3DEffect(.degrees(-motion.pitch * tiltMultiplier * 6), axis: (x: 1, y: 0, z: 0), perspective: 0.45)
+        .rotation3DEffect(.degrees(motion.roll * tiltMultiplier * 8), axis: (x: 0, y: 1, z: 0), perspective: 0.45)
+        .shadow(color: accent.opacity(0.16), radius: 18, y: 10)
+        .shadow(color: .black.opacity(0.14), radius: 22, y: 14)
         .contentShape(RoundedRectangle(cornerRadius: Radius.xl))
         .onTapGesture {
             withAnimation(.spring(response: 0.52, dampingFraction: 0.84)) {
                 isFlipped.toggle()
             }
         }
-        .onAppear { motion.start() }
+        .onAppear {
+            if userProfile.cardMotionEnabled {
+                motion.start()
+            }
+        }
+        .onChange(of: userProfile.cardMotionEnabled) { _, isEnabled in
+            if isEnabled {
+                motion.start()
+            } else {
+                motion.stop()
+            }
+        }
         .onDisappear { motion.stop() }
     }
 
     private var frontFace: some View {
         cardShell {
             VStack(alignment: .leading, spacing: Spacing.md) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("LOOP ID")
-                            .font(LoopFont.bold(11))
-                            .foregroundColor(.white.opacity(0.7))
-                        Text(identityTitle)
-                            .font(LoopFont.black(24))
-                            .foregroundColor(.white)
-                            .fixedSize(horizontal: false, vertical: true)
+                ViewThatFits(in: .vertical) {
+                    HStack(alignment: .top) {
+                        identityHeader
+                        Spacer()
+                        customizationButton
                     }
 
-                    Spacer()
-
-                    heroPill(icon: "wave.3.right", text: "Mueve tu telefono")
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        identityHeader
+                        customizationButton
+                    }
                 }
 
-                HStack(alignment: .center, spacing: Spacing.md) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [accent.opacity(0.92), secondaryAccent.opacity(0.96)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 78, height: 78)
-
-                        Circle()
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                            .frame(width: 78, height: 78)
-
-                        Image(systemName: avatarSymbol)
-                            .font(.system(size: 26, weight: .bold))
-                            .foregroundColor(.white)
+                ViewThatFits(in: .vertical) {
+                    HStack(alignment: .center, spacing: Spacing.md) {
+                        avatarSeal
+                        identitySummary
                     }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(displayName)
-                            .font(LoopFont.bold(22))
-                            .foregroundColor(.white)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(identitySubtitle)
-                            .font(LoopFont.regular(13))
-                            .foregroundColor(.white.opacity(0.76))
-                            .fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: Spacing.md) {
+                        avatarSeal
+                        identitySummary
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 ViewThatFits(in: .vertical) {
@@ -150,19 +137,33 @@ struct LoopIdentityCard: View {
     private var backFace: some View {
         cardShell {
             VStack(alignment: .leading, spacing: Spacing.md) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("SNAPSHOT")
-                            .font(LoopFont.bold(11))
-                            .foregroundColor(.white.opacity(0.7))
-                        Text("Tu progreso actual")
-                            .font(LoopFont.bold(20))
-                            .foregroundColor(.white)
+                ViewThatFits(in: .vertical) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("SNAPSHOT")
+                                .font(LoopFont.bold(11))
+                                .foregroundColor(.white.opacity(0.7))
+                            Text("Tu progreso actual")
+                                .font(LoopFont.bold(20))
+                                .foregroundColor(.white)
+                        }
+
+                        Spacer()
+
+                        customizationButton
                     }
 
-                    Spacer()
-
-                    heroPill(icon: "hand.tap.fill", text: "Toca para volver")
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("SNAPSHOT")
+                                .font(LoopFont.bold(11))
+                                .foregroundColor(.white.opacity(0.7))
+                            Text("Tu progreso actual")
+                                .font(LoopFont.bold(20))
+                                .foregroundColor(.white)
+                        }
+                        customizationButton
+                    }
                 }
 
                 ViewThatFits(in: .vertical) {
@@ -206,6 +207,77 @@ struct LoopIdentityCard: View {
         }
     }
 
+    private var identityHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(userProfile.cardBadge.rawValue.uppercased())
+                .font(LoopFont.bold(11))
+                .foregroundColor(.white.opacity(0.7))
+            Text(identityTitle)
+                .font(LoopFont.black(24))
+                .foregroundColor(.white)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var customizationButton: some View {
+        Button(action: onCustomize) {
+            HStack(spacing: 6) {
+                Image(systemName: isCustomizerPresented ? "xmark" : "slider.horizontal.3")
+                    .font(.system(size: 11, weight: .bold))
+                Text(isCustomizerPresented ? "Cerrar" : "Editar")
+                    .font(LoopFont.bold(12))
+                    .lineLimit(1)
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.08))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var avatarSeal: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [accent.opacity(0.92), secondaryAccent.opacity(0.96)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 78, height: 78)
+
+            Circle()
+                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                .frame(width: 78, height: 78)
+
+            Image(systemName: avatarSymbol)
+                .font(.system(size: 26, weight: .bold))
+                .foregroundColor(.white)
+        }
+    }
+
+    private var identitySummary: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(displayName)
+                .font(LoopFont.bold(22))
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(identitySubtitle)
+                .font(LoopFont.regular(13))
+                .foregroundColor(.white.opacity(0.76))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func cardShell<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         ZStack(alignment: .topTrailing) {
             RoundedRectangle(cornerRadius: Radius.xl)
@@ -223,7 +295,11 @@ struct LoopIdentityCard: View {
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: Radius.xl))
                 .overlay(
                     RoundedRectangle(cornerRadius: Radius.xl)
-                        .fill(Color.white.opacity(0.05))
+                        .fill(Color.loopBG.opacity(0.2))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.xl)
+                        .fill(Color.white.opacity(0.04))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Radius.xl)
@@ -233,49 +309,22 @@ struct LoopIdentityCard: View {
             RoundedRectangle(cornerRadius: Radius.xl)
                 .fill(
                     LinearGradient(
-                        colors: [Color.white.opacity(0.28), .clear, Color.black.opacity(0.18)],
-                        startPoint: UnitPoint(x: 0.12 - motion.roll * 0.18, y: 0.02 + motion.pitch * 0.12),
+                        colors: [Color.white.opacity(0.2), .clear, Color.black.opacity(0.14)],
+                        startPoint: UnitPoint(x: 0.18 - motion.roll * 0.12, y: 0.04 + motion.pitch * 0.08),
                         endPoint: .bottomTrailing
                     )
                 )
                 .blendMode(.screen)
 
-            LoopSceneAccent(tint: .white.opacity(0.9))
-                .opacity(0.42)
-                .padding(.top, -10)
-                .padding(.trailing, -6)
-
-            VStack {
-                RoundedRectangle(cornerRadius: Radius.xl)
-                    .fill(Color.white.opacity(0.08))
-                    .frame(height: 1)
-                Spacer()
-            }
+            LoopSceneAccent(tint: .white.opacity(0.8))
+                .opacity(0.18)
+                .padding(.top, -8)
+                .padding(.trailing, -4)
 
             content()
                 .padding(Spacing.xl)
         }
         .clipShape(RoundedRectangle(cornerRadius: Radius.xl))
-    }
-
-    private func heroPill(icon: String, text: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
-            Text(text)
-                .font(LoopFont.bold(12))
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .foregroundColor(.white)
-        .padding(.horizontal, Spacing.md)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.08))
-        .clipShape(Capsule())
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-        )
     }
 
     private func statPill(icon: String, text: String) -> some View {
@@ -347,6 +396,10 @@ struct LoopIdentityCard: View {
         return trimmed.isEmpty ? "Loop Learner" : trimmed
     }
 
+    private var tiltMultiplier: Double {
+        userProfile.cardMotionEnabled ? 1 : 0
+    }
+
     private var avatarSymbol: String {
         let index = min(max(userProfile.avatarIndex, 0), avatars.count - 1)
         return avatars[index]
@@ -387,31 +440,27 @@ struct LoopIdentityCard: View {
     }
 
     private var backSummary: String {
-        "Estas construyendo una identidad de \(identityTitle.lowercased()) con \(userProfile.minutesPerDay) minutos por sesion, \(activeDaysCount) dias activos y una racha de \(gameState.currentStreak) dias."
+        "Estas construyendo una identidad de \(identityTitle.lowercased()) con badge \(userProfile.cardBadge.rawValue.lowercased()), \(userProfile.minutesPerDay) minutos por sesion y una racha de \(gameState.currentStreak) dias."
     }
 
     private var accent: Color {
-        switch userProfile.goal {
-        case .createApps:
+        switch userProfile.cardPalette {
+        case .coral:
             return .coral
-        case .getJob:
-            return .loopGold
-        case .passClasses:
-            return .periwinkle
-        case .curiosity:
+        case .aurora:
             return .mint
+        case .midnight:
+            return .periwinkle
         }
     }
 
     private var secondaryAccent: Color {
-        switch userProfile.knowledgeLevel {
-        case .zero:
+        switch userProfile.cardPalette {
+        case .coral:
             return .amethyst
-        case .someReading:
+        case .aurora:
             return .cerulean
-        case .basicKnows:
-            return .periwinkle
-        case .hasPractice:
+        case .midnight:
             return .loopGold
         }
     }

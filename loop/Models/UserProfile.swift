@@ -49,6 +49,20 @@ enum ProgrammingLanguage: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum IdentityCardPalette: String, Codable, CaseIterable, Identifiable {
+    case coral = "Coral"
+    case aurora = "Aurora"
+    case midnight = "Midnight"
+    var id: String { rawValue }
+}
+
+enum IdentityCardBadge: String, Codable, CaseIterable, Identifiable {
+    case creador = "Creador"
+    case enfoque = "Enfoque"
+    case racha = "Racha"
+    var id: String { rawValue }
+}
+
 struct UserProfile: Codable {
     var name: String = ""
     var avatarIndex: Int = 0
@@ -62,5 +76,8 @@ struct UserProfile: Codable {
     var knowledgeLevel: Level = .zero
     var minutesPerDay: Int = 10
     var activeDays: Set<Weekday> = [.l, .m, .x, .j, .v]
+    var cardPalette: IdentityCardPalette = .coral
+    var cardBadge: IdentityCardBadge = .creador
+    var cardMotionEnabled = true
     var generatedPlan: LearningPlan?
 }
