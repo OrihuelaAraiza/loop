@@ -8,16 +8,22 @@ struct LoopMeshBackground: View {
     private let coral = Color(hex: "EE6352")
 
     var body: some View {
-        Group {
-            if #available(iOS 18, *) {
-                if reduceMotion {
-                    staticMesh
+        ZStack {
+            Group {
+                if #available(iOS 18, *) {
+                    if reduceMotion {
+                        staticMesh
+                    } else {
+                        animatedMesh
+                    }
                 } else {
-                    animatedMesh
+                    fallbackGradient
                 }
-            } else {
-                fallbackGradient
             }
+
+            Color.clear
+                .loopGrain(intensity: 0.020)
+                .allowsHitTesting(false)
         }
         .ignoresSafeArea()
     }

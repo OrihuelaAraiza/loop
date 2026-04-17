@@ -1,4 +1,3 @@
-import Pow
 import SwiftUI
 
 struct LoopChip: View {
@@ -53,12 +52,9 @@ struct LoopChip: View {
             .shadow(color: isSelected ? tint.opacity(0.28) : .clear, radius: 10, y: 4)
             .scaleEffect(isSelected ? 1.02 : 1)
             .animation(reduceMotion ? nil : LoopAnimation.springFast, value: isSelected)
+            .loopSelectionBloom(isSelected: isSelected, tint: tint, shape: .roundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
-        .changeEffect(.spray(origin: UnitPoint.center) {
-            Image(systemName: "sparkle")
-                .foregroundColor(tint)
-        }, value: isSelected, isEnabled: isSelected && !reduceMotion)
         .accessibilityLabel(Text(title))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
     }

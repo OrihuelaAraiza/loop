@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A10000052F90617300EB48F0 /* SkeletonUI in Frameworks */ = {isa = PBXBuildFile; productRef = A10000062F90617300EB48F0 /* SkeletonUI */; };
+		A10000072F90617300EB48F0 /* SPAlert in Frameworks */ = {isa = PBXBuildFile; productRef = A10000082F90617300EB48F0 /* SPAlert */; };
 		E80822242F90617300EB48F0 /* HighlightSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E80822222F90617300EB48F0 /* HighlightSwift */; };
 		E80822252F90617300EB48F0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = E80822232F90617300EB48F0 /* Lottie */; };
 		E8EB55CD2F91BBB300865574 /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = A10000012F90617300EB48F0 /* Pow */; };
@@ -61,6 +63,8 @@
 			files = (
 				E8EB55CE2F91BBB300865574 /* Vortex in Frameworks */,
 				E8EB55CD2F91BBB300865574 /* Pow in Frameworks */,
+				A10000052F90617300EB48F0 /* SkeletonUI in Frameworks */,
+				A10000072F90617300EB48F0 /* SPAlert in Frameworks */,
 				E80822242F90617300EB48F0 /* HighlightSwift in Frameworks */,
 				E80822252F90617300EB48F0 /* Lottie in Frameworks */,
 			);
@@ -127,6 +131,8 @@
 				E80822232F90617300EB48F0 /* Lottie */,
 				A10000012F90617300EB48F0 /* Pow */,
 				A10000022F90617300EB48F0 /* Vortex */,
+				A10000062F90617300EB48F0 /* SkeletonUI */,
+				A10000082F90617300EB48F0 /* SPAlert */,
 			);
 			productName = loop;
 			productReference = E80821EE2F90617300EB48EF /* loop.app */;
@@ -215,6 +221,8 @@
 				E80822212F90617300EB48F0 /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				A10000032F90617300EB48F0 /* XCRemoteSwiftPackageReference "Pow" */,
 				A10000042F90617300EB48F0 /* XCRemoteSwiftPackageReference "Vortex" */,
+				A10000092F90617300EB48F0 /* XCRemoteSwiftPackageReference "SkeletonUI" */,
+				A100000A2F90617300EB48F0 /* XCRemoteSwiftPackageReference "SPAlert" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E80821EF2F90617300EB48EF /* Products */;
@@ -428,6 +436,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -462,6 +471,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -621,6 +631,22 @@
 				minimumVersion = 1.0.0;
 			};
 		};
+		A10000092F90617300EB48F0 /* XCRemoteSwiftPackageReference "SkeletonUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/CSolanaM/SkeletonUI";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+		A100000A2F90617300EB48F0 /* XCRemoteSwiftPackageReference "SPAlert" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ivanvorobei/SPAlert";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.0;
+			};
+		};
 		E80822202F90617300EB48F0 /* XCRemoteSwiftPackageReference "HighlightSwift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/appstefan/HighlightSwift";
@@ -649,6 +675,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A10000042F90617300EB48F0 /* XCRemoteSwiftPackageReference "Vortex" */;
 			productName = Vortex;
+		};
+		A10000062F90617300EB48F0 /* SkeletonUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000092F90617300EB48F0 /* XCRemoteSwiftPackageReference "SkeletonUI" */;
+			productName = SkeletonUI;
+		};
+		A10000082F90617300EB48F0 /* SPAlert */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A100000A2F90617300EB48F0 /* XCRemoteSwiftPackageReference "SPAlert" */;
+			productName = SPAlert;
 		};
 		E80822222F90617300EB48F0 /* HighlightSwift */ = {
 			isa = XCSwiftPackageProductDependency;

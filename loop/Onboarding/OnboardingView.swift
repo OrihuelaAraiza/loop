@@ -254,7 +254,6 @@ private struct OnboardingSelectableCard<Content: View>: View {
 
 private struct OnboardingWelcomeView: View {
     let next: () -> Void
-    @State private var showBubble = false
     @State private var showFeatures = false
 
     private let features: [(icon: String, tint: Color, title: String, detail: String)] = [
@@ -303,11 +302,6 @@ private struct OnboardingWelcomeView: View {
             }
         }
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                withAnimation(LoopAnimation.springMedium) {
-                    showBubble = true
-                }
-            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
                 showFeatures = true
             }
@@ -316,29 +310,33 @@ private struct OnboardingWelcomeView: View {
 
     @ViewBuilder
     private var loopyCard: some View {
+        let bubble = LoopySpeechBubble(
+            primary: "Te guiare paso a paso para construir constancia real y progreso medible."
+        )
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                .fill(Color.loopSurf2.opacity(0.9))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                .stroke(Color.borderMid, lineWidth: 1)
+        )
+
         let content = ViewThatFits(in: .vertical) {
             HStack(alignment: .center, spacing: Spacing.md) {
                 LoopyView(mood: .speaking)
                     .scaleEffect(0.68)
                     .frame(width: 120, height: 130)
-                if showBubble {
-                    LoopyBubbleView(text: "Te guiare paso a paso para construir constancia real y progreso medible.")
-                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
-                } else {
-                    LoopyTypingDots()
-                }
+                bubble
             }
 
             VStack(alignment: .leading, spacing: Spacing.md) {
                 LoopyView(mood: .speaking)
                     .scaleEffect(0.68)
                     .frame(width: 120, height: 130)
-                if showBubble {
-                    LoopyBubbleView(text: "Te guiare paso a paso para construir constancia real y progreso medible.")
-                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
-                } else {
-                    LoopyTypingDots()
-                }
+                bubble
             }
         }
 
@@ -525,11 +523,9 @@ private struct OnboardingNameView: View {
             .frame(width: 66, height: 66)
             .scaleEffect(isSelected ? 1.06 : 1)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+            .loopSelectionBloom(isSelected: isSelected, tint: .coral, shape: .circle)
         }
         .buttonStyle(.plain)
-        .changeEffect(.spray(origin: UnitPoint.center) {
-            Image(systemName: "sparkle").foregroundColor(.coral)
-        }, value: isSelected, isEnabled: isSelected)
         .accessibilityLabel(Text("Avatar \(index + 1)"))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
     }
@@ -676,7 +672,7 @@ private struct AgeDialPicker: View {
                                         Text(title)
                                             .font(LoopFont.bold(13))
                                             .foregroundColor(Color.loopBG.opacity(0.72))
-                                            .transition(.asymmetric(insertion: .movingParts.pop, removal: .movingParts.poof))
+                                            .transition(.opacity.combined(with: .move(edge: .bottom)))
                                     }
                                 }
                                 .animation(LoopAnimation.springBouncy, value: ageDescriptor.title)
@@ -876,7 +872,12 @@ private struct OnboardingGoalView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.coral)
-                                .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .movingParts.poof))
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .scale.combined(with: .opacity),
+                                        removal: .scale(scale: 0.4).combined(with: .opacity)
+                                    )
+                                )
                         } else {
                             Image(systemName: "circle")
                                 .font(.system(size: 20))
@@ -886,11 +887,9 @@ private struct OnboardingGoalView: View {
                     .animation(LoopAnimation.springBouncy, value: isSelected)
                 }
             }
+            .loopSelectionBloom(isSelected: isSelected, tint: .coral, shape: .roundedRectangle(cornerRadius: Radius.lg))
         }
         .buttonStyle(.plain)
-        .changeEffect(.spray(origin: UnitPoint.center) {
-            Image(systemName: "sparkle").foregroundColor(.coral)
-        }, value: isSelected, isEnabled: isSelected)
     }
 }
 
@@ -914,7 +913,12 @@ private struct OnboardingLevelView: View {
 
             if viewModel.wantsPlacementTest {
                 placementExplainer
-                    .transition(AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity))
+                    .transition(
+                        .asymmetric(
+                            insertion: AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity),
+                            removal: .movingParts.poof
+                        )
+                    )
             }
 
             LoopCTA(title: "Continuar", trailingIcon: "arrow.right", style: .solid(.coral)) {
@@ -967,18 +971,25 @@ private struct OnboardingLevelView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.coral)
-                                .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .movingParts.poof))
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .scale.combined(with: .opacity),
+                                        removal: .scale(scale: 0.4).combined(with: .opacity)
+                                    )
+                                )
                         }
                     }
                     .animation(LoopAnimation.springBouncy, value: isSelected)
                 }
             }
+            .loopSelectionBloom(
+                isSelected: isSelected && !viewModel.wantsPlacementTest,
+                tint: .amethyst,
+                shape: .roundedRectangle(cornerRadius: Radius.lg)
+            )
         }
         .buttonStyle(.plain)
         .disabled(viewModel.wantsPlacementTest)
-        .changeEffect(.spray(origin: UnitPoint.center) {
-            Image(systemName: "sparkle").foregroundColor(.amethyst)
-        }, value: isSelected, isEnabled: isSelected && !viewModel.wantsPlacementTest)
     }
 
     private var placementTestCard: some View {
@@ -1058,8 +1069,7 @@ private struct OnboardingTimeView: View {
     @ObservedObject var viewModel: OnboardingViewModel
     private let minuteOptions = [5, 10, 15, 20, 30]
     private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
-    @State private var showConfetti = false
-    @State private var confettiOpacity: Double = 1
+    @State private var isGenerating = false
 
     private var weeklyMinutes: Int {
         viewModel.userProfile.minutesPerDay * viewModel.userProfile.activeDays.count
@@ -1141,38 +1151,29 @@ private struct OnboardingTimeView: View {
                     }
                 }
                 .buttonStyle(LoopCTAButton())
-                .disabled(viewModel.userProfile.activeDays.isEmpty)
+                .disabled(viewModel.userProfile.activeDays.isEmpty || isGenerating)
                 .opacity(viewModel.userProfile.activeDays.isEmpty ? 0.55 : 1)
             }
 
-            if showConfetti {
-                ConfettiLayer()
-                    .opacity(confettiOpacity)
-                    .allowsHitTesting(false)
-                    .ignoresSafeArea()
+            if isGenerating {
+                PlanGeneratingOverlay()
                     .transition(.opacity)
+                    .zIndex(10)
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: isGenerating)
     }
 
     private func triggerPlanGeneration() {
+        guard !isGenerating else { return }
         HapticManager.shared.impact(.medium)
+        isGenerating = true
         viewModel.generatePlan()
-        withAnimation(.easeIn(duration: 0.1)) {
-            showConfetti = true
-            confettiOpacity = 1
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-            withAnimation(.easeOut(duration: 0.35)) {
-                confettiOpacity = 0
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
             HapticManager.shared.success()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                showConfetti = false
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.85)) {
-                    viewModel.next()
-                }
-            }
+            isGenerating = false
+            LoopToast.planReady()
+            viewModel.next()
         }
     }
 

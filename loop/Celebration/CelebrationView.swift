@@ -45,6 +45,9 @@ struct CelebrationView: View {
             withAnimation(.easeOut(duration: 0.9)) {
                 displayXP = viewModel.xpGained
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                LoopToast.lessonComplete(xp: viewModel.xpGained)
+            }
         }
     }
 

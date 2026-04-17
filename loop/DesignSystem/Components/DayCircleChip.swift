@@ -1,4 +1,3 @@
-import Pow
 import SwiftUI
 
 struct DayCircleChip: View {
@@ -41,11 +40,9 @@ struct DayCircleChip: View {
             .shadow(color: isSelected ? tint.opacity(0.45) : .clear, radius: 8, y: 3)
             .scaleEffect(isSelected ? 1.08 : 1)
             .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
+            .loopSelectionBloom(isSelected: isSelected, tint: tint, shape: .circle)
         }
         .buttonStyle(.plain)
-        .changeEffect(.spray(origin: UnitPoint.center) {
-            Image(systemName: "sparkle").foregroundColor(tint)
-        }, value: isSelected, isEnabled: isSelected && !reduceMotion)
         .accessibilityLabel(Text("Dia \(letter)"))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
     }

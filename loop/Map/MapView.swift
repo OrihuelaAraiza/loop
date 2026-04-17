@@ -22,9 +22,17 @@ struct RoadmapRoute: Identifiable {
     let nodes: [RoadmapNode]
 }
 
+private struct MapScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 struct MapView: View {
     @State private var reveal = false
     @State private var selectedRouteID: UUID?
+    @State private var scrollOffset: CGFloat = 0
 
     private let routes: [RoadmapRoute] = [
         RoadmapRoute(
@@ -69,15 +77,25 @@ struct MapView: View {
     ]
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             LoopMeshBackground()
             ScrollView {
+                GeometryReader { geo in
+                    Color.clear
+                        .preference(
+                            key: MapScrollOffsetKey.self,
+                            value: -geo.frame(in: .named("mapScroll")).minY
+                        )
+                }
+                .frame(height: 0)
+
                 VStack(alignment: .leading, spacing: Spacing.lg) {
                     header
                     routeSelector
 
                     if let route = currentRoute {
                         routeSummary(route: route)
+                            .opacity(expandedHeaderOpacity)
                         roadmap(for: route)
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
@@ -85,6 +103,20 @@ struct MapView: View {
                 .padding(.horizontal, Spacing.lg)
                 .padding(.top, Spacing.xl)
                 .padding(.bottom, 140)
+            }
+            .coordinateSpace(name: "mapScroll")
+            .onPreferenceChange(MapScrollOffsetKey.self) { offset in
+                scrollOffset = offset
+            }
+
+            if let route = currentRoute {
+                collapsedRoutePill(route: route)
+                    .padding(.top, Spacing.sm)
+                    .padding(.horizontal, Spacing.lg)
+                    .opacity(collapsedPillOpacity)
+                    .scaleEffect(collapsedPillOpacity == 0 ? 0.9 : 1)
+                    .allowsHitTesting(collapsedPillOpacity > 0.5)
+                    .animation(.easeOut(duration: 0.2), value: collapsedPillOpacity)
             }
         }
         .onAppear {
@@ -95,6 +127,41 @@ struct MapView: View {
                 reveal = true
             }
         }
+    }
+
+    private var expandedHeaderOpacity: Double {
+        max(0, 1 - Double(scrollOffset) / 140)
+    }
+
+    private var collapsedPillOpacity: Double {
+        max(0, min(1, Double(scrollOffset - 90) / 60))
+    }
+
+    private func collapsedRoutePill(route: RoadmapRoute) -> some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(route.tint)
+                .frame(width: 10, height: 10)
+            Text(route.title)
+                .font(LoopFont.bold(13))
+                .foregroundColor(.textPrimary)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Text("\(Int(route.progress * 100))%")
+                .font(LoopFont.bold(13))
+                .foregroundColor(route.tint)
+        }
+        .padding(.horizontal, Spacing.md)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(Color.loopSurf2.opacity(0.94))
+        )
+        .overlay(
+            Capsule()
+                .stroke(route.tint.opacity(0.55), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
     }
 
     private var currentRoute: RoadmapRoute? {
@@ -287,6 +354,7 @@ private struct RoadmapRow: View {
                 )
                 .shadow(color: shadowColor, radius: node.state == .active ? (pulse ? 22 : 14) : node.state == .completed ? 8 : 4, y: node.state == .active ? 6 : 2)
                 .scaleEffect(node.state == .active && pulse ? 1.06 : 1)
+                .modifier(LockedShimmerModifier(isLocked: node.state == .locked))
 
             Image(systemName: iconName)
                 .font(.system(size: 22, weight: .bold))
@@ -414,6 +482,18 @@ private struct RoadmapConnector: View {
                         )
                 }
             }
+        }
+    }
+}
+
+private struct LockedShimmerModifier: ViewModifier {
+    let isLocked: Bool
+
+    func body(content: Content) -> some View {
+        if isLocked {
+            content.loopShimmer()
+        } else {
+            content
         }
     }
 }

@@ -26,10 +26,13 @@ struct HomeView: View {
                     if revealCards {
                         loopyCard
                             .transition(.move(edge: .bottom).combined(with: .opacity))
+                            .loopScrollReveal()
                         lessonCTA
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                             .transition(.move(edge: .bottom).combined(with: .opacity))
+                            .loopScrollReveal()
                         dashboardSection
                             .transition(.move(edge: .bottom).combined(with: .opacity))
+                            .loopScrollReveal()
                     }
                 }
                 .padding(.horizontal, Spacing.lg)
@@ -74,16 +77,10 @@ struct HomeView: View {
                         .scaleEffect(0.46)
                         .frame(width: 72, height: 72)
                         .clipped()
-                    VStack(alignment: .leading, spacing: Spacing.xs) {
-                        Text("Hola \(learnerName), llevas \(appState.gameState.currentStreak) dias seguidos.")
-                            .font(LoopFont.bold(16))
-                            .foregroundColor(.textPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text("Tu leccion del dia esta lista, cuando quieras empezar.")
-                            .font(LoopFont.regular(13))
-                            .foregroundColor(.textSecond)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    LoopySpeechBubble(
+                        primary: "Hola \(learnerName), llevas \(appState.gameState.currentStreak) dias seguidos.",
+                        secondary: "Tu leccion del dia esta lista, cuando quieras empezar."
+                    )
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
@@ -91,43 +88,44 @@ struct HomeView: View {
     }
 
     private var lessonCTA: some View {
-        Button {
-            HapticManager.shared.impact(.medium)
-            onStartLesson()
-        } label: {
-            LoopCard(accentColor: .coral, showsSceneAccent: true, usesGlassSurface: true) {
-                HStack(alignment: .center, spacing: Spacing.md) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.coral.opacity(0.22))
-                            .frame(width: 52, height: 52)
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.coral)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Leccion del dia")
-                            .font(LoopFont.bold(17))
-                            .foregroundColor(.textPrimary)
-                        Text(activeCourse.map { "\($0.title) · \($0.module)" } ?? "Empieza tu practica de hoy")
-                            .font(LoopFont.regular(13))
-                            .foregroundColor(.textSecond)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 16, weight: .bold))
+        LoopCard(accentColor: .coral, showsSceneAccent: true, usesGlassSurface: true) {
+            HStack(alignment: .center, spacing: Spacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(Color.coral.opacity(0.22))
+                        .frame(width: 52, height: 52)
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.coral)
-                        .padding(10)
-                        .background(Color.coral.opacity(0.16))
-                        .clipShape(Circle())
                 }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Leccion del dia")
+                        .font(LoopFont.bold(17))
+                        .foregroundColor(.textPrimary)
+                    Text(activeCourse.map { "\($0.title) · \($0.module)" } ?? "Empieza tu practica de hoy")
+                        .font(LoopFont.regular(13))
+                        .foregroundColor(.textSecond)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.coral)
+                    .padding(10)
+                    .background(Color.coral.opacity(0.16))
+                    .clipShape(Circle())
             }
         }
-        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .rippleOnTap(fireDelay: 0.4) {
+            HapticManager.shared.impact(.medium)
+            onStartLesson()
+        }
+        .accessibilityElement(children: AccessibilityChildBehavior.combine)
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel("Empezar leccion del dia")
     }
 
@@ -171,11 +169,16 @@ struct HomeView: View {
                         .font(LoopFont.bold(16))
                         .foregroundColor(.textPrimary)
                     Spacer()
-                    Text("\(appState.gameState.dailyXP) / \(appState.gameState.dailyGoal) XP")
-                        .font(LoopFont.bold(14))
-                        .foregroundColor(.mint)
-                        .contentTransition(.numericText())
-                        .animation(LoopAnimation.springMedium, value: appState.gameState.dailyXP)
+                    HStack(spacing: 2) {
+                        XPBounceText(
+                            value: appState.gameState.dailyXP,
+                            font: LoopFont.bold(14),
+                            color: Color.mint
+                        )
+                        Text(" / \(appState.gameState.dailyGoal) XP")
+                            .font(LoopFont.bold(14))
+                            .foregroundColor(Color.mint)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -262,8 +265,37 @@ struct HomeView: View {
     private var statsCluster: some View {
         HStack(spacing: Spacing.sm) {
             ChipView(icon: "flame.fill", text: "\(appState.gameState.currentStreak)", tint: .loopGold)
-            ChipView(icon: "star.fill", text: "\(appState.gameState.totalXP) XP", tint: .periwinkle)
+            xpChip
         }
+    }
+
+    private var xpChip: some View {
+        HStack(alignment: .center, spacing: Spacing.sm) {
+            Circle()
+                .fill(Color.periwinkle.opacity(0.18))
+                .frame(width: 22, height: 22)
+                .overlay(
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.periwinkle)
+                )
+            XPBounceText(
+                value: appState.gameState.totalXP,
+                font: LoopFont.bold(12),
+                color: Color.textPrimary,
+                suffix: " XP"
+            )
+        }
+        .padding(.horizontal, Spacing.md)
+        .padding(.vertical, Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                .fill(Color.loopSurf2.opacity(0.72))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                .stroke(Color.borderSoft, lineWidth: 1)
+        )
     }
 
     private func homePill(icon: String, text: String) -> some View {

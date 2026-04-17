@@ -83,6 +83,13 @@ final class AppState: ObservableObject {
     private func persistGameState() {
         guard let data = try? JSONEncoder().encode(gameState.snapshot()) else { return }
         UserDefaults.standard.set(data, forKey: gameKey)
+
+        LoopWidgetBridge.write(
+            streak: gameState.currentStreak,
+            dailyXP: gameState.dailyXP,
+            targetXP: gameState.dailyGoal,
+            userName: userProfile.name.isEmpty ? "coder" : userProfile.name
+        )
     }
 
     private func persistAuth() {

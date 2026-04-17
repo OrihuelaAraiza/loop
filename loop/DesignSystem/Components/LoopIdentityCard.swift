@@ -179,14 +179,14 @@ struct LoopIdentityCard: View {
 
                 ViewThatFits(in: .vertical) {
                     HStack(spacing: Spacing.sm) {
-                        progressCell(value: "\(gameState.totalXP)", label: "XP")
+                        xpCell
                         progressCell(value: "Nivel \(gameState.level)", label: "Estado")
                         progressCell(value: "\(activeDaysCount)", label: "Dias")
                     }
 
                     VStack(spacing: Spacing.sm) {
                         HStack(spacing: Spacing.sm) {
-                            progressCell(value: "\(gameState.totalXP)", label: "XP")
+                            xpCell
                             progressCell(value: "Nivel \(gameState.level)", label: "Estado")
                         }
                         progressCell(value: "\(activeDaysCount)", label: "Dias")
@@ -369,6 +369,30 @@ struct LoopIdentityCard: View {
         .padding(.vertical, Spacing.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.07))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: Radius.md)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    private var xpCell: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            XPBounceText(
+                value: gameState.totalXP,
+                font: LoopFont.bold(18),
+                color: .white
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            Text("XP")
+                .font(LoopFont.semiBold(11))
+                .foregroundColor(.white.opacity(0.68))
+        }
+        .padding(.horizontal, Spacing.md)
+        .padding(.vertical, Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: Radius.md))
         .overlay(
             RoundedRectangle(cornerRadius: Radius.md)
