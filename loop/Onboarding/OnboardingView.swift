@@ -93,6 +93,10 @@ struct OnboardingFlow: View {
                 viewModel: viewModel,
                 finish: {
                     appState.userProfile = viewModel.userProfile
+                    appState.syncOnboardingProfile(
+                        profile: viewModel.userProfile,
+                        wantsPlacementTest: viewModel.wantsPlacementTest
+                    )
                     appState.hasCompletedOnboarding = true
                 }
             )

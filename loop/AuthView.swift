@@ -6,6 +6,8 @@ struct AuthView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var auth = AppleAuthService()
     @State private var showMockConfirm = false
+    @State private var showCredentialsFlow = false
+    @State private var credentialsMode: CredentialsMode = .login
     @State private var reveal = false
     @State private var heroPulse = false
     @State private var benefitsReveal = false
@@ -31,16 +33,15 @@ struct AuthView: View {
                     footer
                 }
                 .padding(.horizontal, Spacing.lg)
-                .padding(.bottom, Spacing.xl)
+                // Extra bottom padding keeps the last CTA above the home indicator area.
+                .padding(.bottom, 140)
             }
-            .scrollBounceBehavior(.basedOnSize)
+            // Always allow scrolling so lower actions are reachable on smaller viewports.
+            .scrollBounceBehavior(.always)
         }
         .onAppear {
             auth.onSuccess = { session in
-                appState.authSession = session
-                if appState.userProfile.name.isEmpty, let name = session.displayName {
-                    appState.userProfile.name = name
-                }
+                appState.completeSignIn(with: session)
             }
             withAnimation(.spring(response: 0.7, dampingFraction: 0.82)) {
                 reveal = true
@@ -68,6 +69,11 @@ struct AuthView: View {
             Button("Cancelar", role: .cancel) {}
         } message: {
             Text("Entraras con una cuenta invitada. Tu progreso se guarda localmente en este dispositivo.")
+        }
+        .sheet(isPresented: $showCredentialsFlow) {
+            CredentialsAuthSheet(mode: credentialsMode, auth: auth)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -257,11 +263,55 @@ struct AuthView: View {
                     Text("Inicia sesion")
                         .font(LoopFont.bold(20))
                         .foregroundColor(.textPrimary)
-                    Text("Tu racha, XP y perfil 3D se sincronizan en tu cuenta.")
+                    Text("Primero elige como quieres entrar. Correo y Apple guardan tu progreso en backend.")
                         .font(LoopFont.regular(13))
                         .foregroundColor(.textSecond)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
+                Button {
+                    credentialsMode = .login
+                    auth.lastError = nil
+                    showCredentialsFlow = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("Iniciar sesion")
+                            .font(LoopFont.bold(14))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.coral.opacity(0.95))
+                    .clipShape(RoundedRectangle(cornerRadius: Radius.lg))
+                }
+                .buttonStyle(.plain)
+                .disabled(auth.isProcessing)
+
+                Button {
+                    credentialsMode = .register
+                    auth.lastError = nil
+                    showCredentialsFlow = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.badge.plus.fill")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("Crear cuenta")
+                            .font(LoopFont.bold(14))
+                    }
+                    .foregroundColor(.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.loopSurf2.opacity(0.9))
+                    .clipShape(RoundedRectangle(cornerRadius: Radius.lg))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radius.lg)
+                            .stroke(Color.borderSoft, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(auth.isProcessing)
 
                 SignInWithAppleButton(.continue) { request in
                     request.requestedScopes = [.fullName, .email]
@@ -272,6 +322,7 @@ struct AuthView: View {
                 .frame(height: 54)
                 .clipShape(RoundedRectangle(cornerRadius: Radius.lg))
                 .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
+                .disabled(auth.isProcessing)
 
                 HStack(spacing: 10) {
                     Rectangle().fill(Color.borderSoft).frame(height: 1)
@@ -302,6 +353,7 @@ struct AuthView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .disabled(auth.isProcessing)
 
                 if let error = auth.lastError {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -330,6 +382,131 @@ struct AuthView: View {
         }
         .padding(.horizontal, Spacing.xl)
         .padding(.top, Spacing.sm)
+    }
+}
+
+private enum CredentialsMode: String, CaseIterable {
+    case login
+    case register
+
+    var title: String {
+        switch self {
+        case .login:
+            return "Iniciar sesion"
+        case .register:
+            return "Crear cuenta"
+        }
+    }
+}
+
+private struct CredentialsAuthSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var auth: AppleAuthService
+
+    @State private var mode: CredentialsMode
+    @State private var displayName = ""
+    @State private var email = ""
+    @State private var password = ""
+
+    init(mode: CredentialsMode, auth: AppleAuthService) {
+        _mode = State(initialValue: mode)
+        self.auth = auth
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    Picker("Modo", selection: $mode) {
+                        Text("Entrar").tag(CredentialsMode.login)
+                        Text("Crear cuenta").tag(CredentialsMode.register)
+                    }
+                    .pickerStyle(.segmented)
+
+                    if mode == .register {
+                        TextField("Nombre (opcional)", text: $displayName)
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled(true)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    TextField("Correo", text: $email)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.emailAddress)
+                        .autocorrectionDisabled(true)
+                        .textFieldStyle(.roundedBorder)
+
+                    SecureField("Contrasena (min 12)", text: $password)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                        .textFieldStyle(.roundedBorder)
+
+                    Button {
+                        if mode == .register {
+                            auth.registerWithEmail(
+                                name: displayName.trimmedOrNil,
+                                email: email.trimmed,
+                                password: password
+                            )
+                        } else {
+                            auth.signInWithEmail(
+                                email: email.trimmed,
+                                password: password
+                            )
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if auth.isProcessing {
+                                ProgressView().tint(.white)
+                            }
+                            Text(mode == .register ? "Registrar cuenta" : "Entrar")
+                                .fontWeight(.bold)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.coral.opacity(isValid ? 0.95 : 0.45))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!isValid || auth.isProcessing)
+
+                    if let error = auth.lastError {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundColor(.coral)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(Spacing.lg)
+            }
+            .navigationTitle(mode.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cerrar") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private var isValid: Bool {
+        !email.trimmed.isEmpty &&
+            !password.isEmpty &&
+            (mode == .login || password.count >= 12)
+    }
+}
+
+private extension String {
+    var trimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var trimmedOrNil: String? {
+        let value = trimmed
+        return value.isEmpty ? nil : value
     }
 }
 

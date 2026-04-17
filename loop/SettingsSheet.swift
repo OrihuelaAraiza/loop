@@ -111,6 +111,7 @@ struct SettingsSheet: View {
     private var providerLabel: String {
         switch appState.authSession?.provider {
         case .apple: return "Apple ID"
+        case .password: return "Email y contrasena"
         case .mockApple: return "Modo demo"
         case .none: return "Sin sesion"
         }
