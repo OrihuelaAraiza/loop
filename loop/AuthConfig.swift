@@ -37,6 +37,13 @@ enum AuthConfig {
     }
 
     private static func value(for key: String) -> String? {
+        if let env = ProcessInfo.processInfo.environment[key] {
+            let trimmed = env.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+
         guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String else {
             return nil
         }

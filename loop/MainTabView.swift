@@ -28,19 +28,25 @@ struct MainTabView: View {
         }
         .fullScreenCover(isPresented: $showExercise) {
             ExerciseView(
+                lesson: appState.todayLesson,
                 onCompleted: {
                     showExercise = false
                     showCelebration = true
+                    appState.refreshTodayLesson()
                 },
                 onClose: {
                     showExercise = false
                 }
             )
+            .environmentObject(appState)
         }
         .fullScreenCover(isPresented: $showCelebration) {
             CelebrationView {
                 showCelebration = false
             }
+        }
+        .onAppear {
+            appState.refreshTodayLesson()
         }
     }
 }

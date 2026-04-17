@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 enum RoadmapNodeState {
     case completed
@@ -8,18 +9,11 @@ enum RoadmapNodeState {
 
 struct RoadmapNode: Identifiable {
     let id = UUID()
+    let order: Int
     let title: String
     let icon: String
     let state: RoadmapNodeState
-}
-
-struct RoadmapRoute: Identifiable {
-    let id = UUID()
-    let title: String
-    let subtitle: String
-    let tint: Color
-    let progress: Double
-    let nodes: [RoadmapNode]
+    let isInteractive: Bool
 }
 
 private struct MapScrollOffsetKey: PreferenceKey {
@@ -30,52 +24,13 @@ private struct MapScrollOffsetKey: PreferenceKey {
 }
 
 struct MapView: View {
-    @Environment(\.isJuniorMode) private var isJuniorMode
+    @EnvironmentObject var appState: AppState
     @State private var reveal = false
-    @State private var selectedRouteID: UUID?
     @State private var scrollOffset: CGFloat = 0
+    @State private var theoryLesson: LessonPayload?
+    @State private var practiceLesson: LessonPayload?
 
-    private let routes: [RoadmapRoute] = [
-        RoadmapRoute(
-            title: "Python Foundations",
-            subtitle: "Variables, flujo y funciones",
-            tint: .coral,
-            progress: 0.42,
-            nodes: [
-                .init(title: "Intro a Python", icon: "play.fill", state: .completed),
-                .init(title: "Variables", icon: "number", state: .completed),
-                .init(title: "Condicionales", icon: "arrow.triangle.branch", state: .active),
-                .init(title: "Loops", icon: "arrow.clockwise", state: .locked),
-                .init(title: "Funciones", icon: "function", state: .locked),
-                .init(title: "Proyecto final", icon: "star.fill", state: .locked)
-            ]
-        ),
-        RoadmapRoute(
-            title: "JavaScript Start",
-            subtitle: "Base del web moderno",
-            tint: .periwinkle,
-            progress: 0.18,
-            nodes: [
-                .init(title: "Sintaxis", icon: "curlybraces", state: .completed),
-                .init(title: "DOM", icon: "doc.richtext", state: .active),
-                .init(title: "Eventos", icon: "hand.tap.fill", state: .locked),
-                .init(title: "Fetch", icon: "network", state: .locked),
-                .init(title: "Proyecto web", icon: "star.fill", state: .locked)
-            ]
-        ),
-        RoadmapRoute(
-            title: "Web Core",
-            subtitle: "HTML y CSS semantico",
-            tint: .mint,
-            progress: 0,
-            nodes: [
-                .init(title: "HTML", icon: "chevron.left.slash.chevron.right", state: .locked),
-                .init(title: "CSS", icon: "paintpalette.fill", state: .locked),
-                .init(title: "Layout", icon: "rectangle.3.group.fill", state: .locked),
-                .init(title: "Responsive", icon: "iphone", state: .locked)
-            ]
-        )
-    ]
+    private let refreshTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -92,14 +47,10 @@ struct MapView: View {
 
                 VStack(alignment: .leading, spacing: Spacing.lg) {
                     header
-                    routeSelector
-
-                    if let route = currentRoute {
-                        routeSummary(route: route)
-                            .opacity(expandedHeaderOpacity)
-                        roadmap(for: route)
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
+                    routeSummary
+                        .opacity(expandedHeaderOpacity)
+                    roadmap
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
                 .padding(.horizontal, Spacing.lg)
                 .padding(.top, Spacing.xl)
@@ -109,24 +60,41 @@ struct MapView: View {
             .onPreferenceChange(MapScrollOffsetKey.self) { offset in
                 scrollOffset = offset
             }
-
-            if let route = currentRoute {
-                collapsedRoutePill(route: route)
-                    .padding(.top, Spacing.sm)
-                    .padding(.horizontal, Spacing.lg)
-                    .opacity(collapsedPillOpacity)
-                    .scaleEffect(collapsedPillOpacity == 0 ? 0.9 : 1)
-                    .allowsHitTesting(collapsedPillOpacity > 0.5)
-                    .animation(.easeOut(duration: 0.2), value: collapsedPillOpacity)
-            }
         }
         .onAppear {
-            if selectedRouteID == nil {
-                selectedRouteID = routes.first?.id
-            }
+            appState.refreshTodayLesson()
             withAnimation(.spring(response: 0.6, dampingFraction: 0.86).delay(0.05)) {
                 reveal = true
             }
+        }
+        .onReceive(refreshTimer) { _ in
+            guard isStillGenerating else { return }
+            appState.refreshTodayLesson()
+        }
+        .fullScreenCover(item: $theoryLesson) { lesson in
+            LessonTheoryView(
+                lesson: lesson,
+                onStartPractice: {
+                    theoryLesson = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        practiceLesson = lesson
+                    }
+                },
+                onClose: { theoryLesson = nil }
+            )
+        }
+        .fullScreenCover(item: $practiceLesson) { lesson in
+            ExerciseView(
+                lesson: lesson,
+                onCompleted: {
+                    practiceLesson = nil
+                    appState.refreshTodayLesson()
+                },
+                onClose: {
+                    practiceLesson = nil
+                }
+            )
+            .environmentObject(appState)
         }
     }
 
@@ -134,47 +102,88 @@ struct MapView: View {
         max(0, 1 - Double(scrollOffset) / 140)
     }
 
-    private var collapsedPillOpacity: Double {
-        max(0, min(1, Double(scrollOffset - 90) / 60))
+    private var isStillGenerating: Bool {
+        let status = appState.currentCourse?.status ?? "draft"
+        return status != "ready_full"
     }
 
-    private func collapsedRoutePill(route: RoadmapRoute) -> some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(route.tint)
-                .frame(width: 10, height: 10)
-            Text(route.title)
-                .font(LoopFont.bold(13))
-                .foregroundColor(.textPrimary)
-                .lineLimit(1)
-            Spacer(minLength: 8)
-            Text("\(Int(route.progress * 100))%")
-                .font(LoopFont.bold(13))
-                .foregroundColor(route.tint)
+    private var courseTitle: String {
+        appState.currentCourse?.generatedCourseTitle ??
+            appState.currentCourse?.title ??
+            "Generando curso..."
+    }
+
+    private var totalLessons: Int {
+        max(appState.currentCourse?.totalLessons ?? 1, 1)
+    }
+
+    private var readyLessons: Int {
+        appState.currentCourse?.lessonStatusCounts["ready"] ?? 0
+    }
+
+    private var routeProgress: Double {
+        min(max(Double(readyLessons) / Double(max(totalLessons, 1)), 0), 1)
+    }
+
+    private var generatedDescription: String {
+        if let description = appState.currentCourse?.generatedDescription,
+           !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return description
         }
-        .padding(.horizontal, Spacing.md)
-        .padding(.vertical, 10)
-        .background(
-            Capsule()
-                .fill(Color.loopSurf2.opacity(0.94))
-        )
-        .overlay(
-            Capsule()
-                .stroke(route.tint.opacity(0.55), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
+
+        if isStillGenerating {
+            return "Tu ruta se va construyendo en vivo. Apenas se genera una leccion, se desbloquea aqui."
+        }
+
+        return "Ruta lista. Avanza teoria + practica para desbloquear nuevas lecciones."
     }
 
-    private var currentRoute: RoadmapRoute? {
-        routes.first(where: { $0.id == selectedRouteID }) ?? routes.first
+    private var todayOrderIndex: Int? {
+        appState.todayLesson?.orderIndex
+    }
+
+    private var roadmapNodes: [RoadmapNode] {
+        let activeOrder = todayOrderIndex ?? (readyLessons > 0 ? 1 : nil)
+
+        return (1 ... totalLessons).map { index in
+            let state: RoadmapNodeState
+            if let activeOrder {
+                if index < activeOrder {
+                    state = .completed
+                } else if index == activeOrder {
+                    state = .active
+                } else {
+                    state = index <= readyLessons ? .active : .locked
+                }
+            } else {
+                state = index <= readyLessons ? .active : .locked
+            }
+
+            let title: String
+            if index == todayOrderIndex, let lessonTitle = appState.todayLesson?.title {
+                title = lessonTitle
+            } else {
+                title = "Leccion \(index)"
+            }
+
+            let isInteractive = index == todayOrderIndex && appState.todayLesson != nil
+
+            return RoadmapNode(
+                order: index,
+                title: title,
+                icon: "book.fill",
+                state: state,
+                isInteractive: isInteractive
+            )
+        }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(LoopCopy.mapTitle(junior: isJuniorMode))
+            Text("Mapa")
                 .font(LoopFont.black(30))
                 .foregroundColor(.textPrimary)
-            Text("Avanza nodo por nodo. Cada leccion desbloquea la siguiente en tu mapa.")
+            Text("Tu curso se construye en vivo. Cada nodo desbloquea teoria y luego ejercicios.")
                 .font(LoopFont.regular(13))
                 .foregroundColor(.textSecond)
                 .fixedSize(horizontal: false, vertical: true)
@@ -182,73 +191,46 @@ struct MapView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var routeSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Spacing.sm) {
-                ForEach(routes) { route in
-                    Button {
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
-                            selectedRouteID = route.id
-                        }
-                    } label: {
-                        routeChip(route: route, isSelected: route.id == selectedRouteID)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.vertical, 4)
-        }
-    }
-
-    private func routeChip(route: RoadmapRoute, isSelected: Bool) -> some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(route.tint)
-                .frame(width: 8, height: 8)
-            Text(route.title)
-                .font(LoopFont.bold(13))
-                .foregroundColor(isSelected ? .textPrimary : .textSecond)
-        }
-        .padding(.horizontal, Spacing.md)
-        .padding(.vertical, 10)
-        .background(
-            Capsule()
-                .fill(isSelected ? Color.loopSurf2.opacity(0.92) : Color.loopSurf1.opacity(0.62))
-        )
-        .overlay(
-            Capsule()
-                .stroke(isSelected ? route.tint.opacity(0.6) : Color.borderSoft, lineWidth: 1)
-        )
-    }
-
-    private func routeSummary(route: RoadmapRoute) -> some View {
-        LoopCard(accentColor: route.tint, showsSceneAccent: true, usesGlassSurface: true) {
+    private var routeSummary: some View {
+        LoopCard(accentColor: .coral, showsSceneAccent: true, usesGlassSurface: true) {
             VStack(alignment: .leading, spacing: Spacing.sm) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(route.title)
+                        Text(courseTitle)
                             .font(LoopFont.bold(18))
                             .foregroundColor(.textPrimary)
-                        Text(route.subtitle)
+                        Text(generatedDescription)
                             .font(LoopFont.regular(12))
                             .foregroundColor(.textSecond)
+                            .lineLimit(3)
                     }
                     Spacer()
-                    Text("\(Int(route.progress * 100))%")
+                    Text("\(Int(routeProgress * 100))%")
                         .font(LoopFont.bold(16))
-                        .foregroundColor(route.tint)
+                        .foregroundColor(.coral)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(route.tint.opacity(0.16))
+                        .background(Color.coral.opacity(0.16))
                         .clipShape(Capsule())
                 }
-                LoopProgressBar(progress: route.progress, height: 10)
+                LoopProgressBar(progress: routeProgress, height: 10)
+                HStack {
+                    Text("Lecciones listas: \(readyLessons)/\(totalLessons)")
+                        .font(LoopFont.regular(12))
+                        .foregroundColor(.textSecond)
+                    Spacer()
+                    if isStillGenerating {
+                        Text("Generando...")
+                            .font(LoopFont.bold(11))
+                            .foregroundColor(.loopGold)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private func roadmap(for route: RoadmapRoute) -> some View {
+    private var roadmap: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             Text("Roadmap")
                 .font(LoopFont.bold(16))
@@ -258,12 +240,16 @@ struct MapView: View {
 
             LoopCard(accentColor: .clear, usesGlassSurface: true) {
                 VStack(spacing: 0) {
-                    ForEach(Array(route.nodes.enumerated()), id: \.element.id) { index, node in
+                    ForEach(Array(roadmapNodes.enumerated()), id: \.element.id) { index, node in
                         RoadmapRow(
                             node: node,
-                            tint: route.tint,
+                            tint: .coral,
                             index: index,
-                            total: route.nodes.count
+                            total: roadmapNodes.count,
+                            onTap: {
+                                guard node.isInteractive, let lesson = appState.todayLesson else { return }
+                                theoryLesson = lesson
+                            }
                         )
                         .scaleEffect(reveal ? 1 : 0.96)
                         .opacity(reveal ? 1 : 0)
@@ -284,8 +270,8 @@ private struct RoadmapRow: View {
     let tint: Color
     let index: Int
     let total: Int
+    var onTap: (() -> Void)? = nil
 
-    @Environment(\.isJuniorMode) private var isJuniorMode
     @State private var pulse = false
     @State private var connectorProgress: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -325,6 +311,12 @@ private struct RoadmapRow: View {
                     pulse = true
                 }
             }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard node.isInteractive else { return }
+            HapticManager.shared.impact(.medium)
+            onTap?()
         }
     }
 
@@ -432,9 +424,9 @@ private struct RoadmapRow: View {
 
     private var stateLabel: String {
         switch node.state {
-        case .completed: return LoopCopy.completedLabel(junior: isJuniorMode)
-        case .active: return LoopCopy.continueHereLabel(junior: isJuniorMode)
-        case .locked: return LoopCopy.lockedLabel(junior: isJuniorMode)
+        case .completed: return "Completado"
+        case .active: return node.isInteractive ? "Empieza teoria" : "Disponible"
+        case .locked: return "Bloqueado"
         }
     }
 

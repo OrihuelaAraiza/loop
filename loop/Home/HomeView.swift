@@ -2,7 +2,6 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject var appState: AppState
-    @Environment(\.isJuniorMode) private var isJuniorMode
     @StateObject private var viewModel = HomeViewModel()
     @State private var revealCards = false
 
@@ -13,8 +12,20 @@ struct HomeView: View {
         appState.userProfile.name.isEmpty ? "coder" : appState.userProfile.name
     }
 
-    private var activeCourse: CourseItem? {
-        viewModel.courses.first(where: { $0.isActive }) ?? viewModel.courses.first
+    private var lessonSubtitle: String {
+        if appState.isLoadingTodayLesson {
+            return "Cargando tu leccion personalizada..."
+        }
+
+        if let lesson = appState.todayLesson {
+            return "\(lesson.title) · \(lesson.estimatedMinutes) min"
+        }
+
+        if appState.isGeneratingCourse {
+            return "Estamos preparando tu ruta de aprendizaje."
+        }
+
+        return "Empieza tu practica de hoy"
     }
 
     var body: some View {
@@ -44,6 +55,7 @@ struct HomeView: View {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.86).delay(0.05)) {
                 revealCards = true
             }
+            appState.refreshTodayLesson()
         }
     }
 
@@ -68,16 +80,19 @@ struct HomeView: View {
                 HStack {
                     homePill(icon: "sparkles", text: "Mentor del dia")
                     Spacer()
-                    Text("\(LoopCopy.streakLabel(junior: isJuniorMode)): \(appState.gameState.currentStreak)")
+                    Text("Racha \(appState.gameState.currentStreak)")
                         .font(LoopFont.bold(12))
                         .foregroundColor(.loopGold)
                 }
 
                 HStack(alignment: .center, spacing: Spacing.md) {
-                    LoopyExpressionView(expression: .idle, size: isJuniorMode ? 100 : 80)
-                        .frame(width: isJuniorMode ? 100 : 80, height: isJuniorMode ? 108 : 86)
+                    LoopyView(mood: .idle)
+                        .scaleEffect(0.46)
+                        .frame(width: 72, height: 72)
+                        .clipped()
                     LoopySpeechBubble(
-                        primary: "Hola \(learnerName), \(LoopCopy.streakMessage(days: appState.gameState.currentStreak, junior: isJuniorMode))"
+                        primary: "Hola \(learnerName), llevas \(appState.gameState.currentStreak) dias seguidos.",
+                        secondary: appState.todayLesson == nil ? "Estamos preparando una leccion para ti." : "Tu leccion del dia esta lista, cuando quieras empezar."
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -101,7 +116,7 @@ struct HomeView: View {
                     Text("Leccion del dia")
                         .font(LoopFont.bold(17))
                         .foregroundColor(.textPrimary)
-                    Text(activeCourse.map { "\($0.title) · \($0.module)" } ?? "Empieza tu practica de hoy")
+                    Text(lessonSubtitle)
                         .font(LoopFont.regular(13))
                         .foregroundColor(.textSecond)
                         .lineLimit(2)
@@ -119,6 +134,10 @@ struct HomeView: View {
         }
         .contentShape(Rectangle())
         .rippleOnTap(fireDelay: 0.4) {
+            guard appState.todayLesson != nil else {
+                appState.refreshTodayLesson()
+                return
+            }
             HapticManager.shared.impact(.medium)
             onStartLesson()
         }
@@ -131,7 +150,7 @@ struct HomeView: View {
         LoopCard(accentColor: .loopGold.opacity(0.6), usesGlassSurface: true) {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 HStack(alignment: .center) {
-                    Text(isJuniorMode ? "Dias seguidos de la semana" : "Racha semanal")
+                    Text("Racha semanal")
                         .font(LoopFont.bold(14))
                         .foregroundColor(.textSecond)
                         .textCase(.uppercase)
@@ -173,14 +192,14 @@ struct HomeView: View {
                             font: LoopFont.bold(14),
                             color: Color.mint
                         )
-                        Text(" / \(appState.gameState.dailyGoal) \(LoopCopy.xpLabel(junior: isJuniorMode))")
+                        Text(" / \(appState.gameState.dailyGoal) XP")
                             .font(LoopFont.bold(14))
                             .foregroundColor(Color.mint)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                LoopProgressBar(progress: Double(appState.gameState.dailyXP) / Double(appState.gameState.dailyGoal), height: 12)
+                LoopProgressBar(progress: safeDailyGoalProgress, height: 12)
 
                 Text("Con una sesion mas completas el objetivo del dia.")
                     .font(LoopFont.regular(12))
@@ -224,6 +243,12 @@ struct HomeView: View {
                 )
             }
         }
+    }
+
+    private var safeDailyGoalProgress: Double {
+        let goal = max(appState.gameState.dailyGoal, 1)
+        let progress = Double(appState.gameState.dailyXP) / Double(goal)
+        return min(max(progress, 0), 1)
     }
 
     private var dashboardSection: some View {
@@ -281,7 +306,7 @@ struct HomeView: View {
                 value: appState.gameState.totalXP,
                 font: LoopFont.bold(12),
                 color: Color.textPrimary,
-                suffix: " \(LoopCopy.xpLabel(junior: isJuniorMode))"
+                suffix: " XP"
             )
         }
         .padding(.horizontal, Spacing.md)

@@ -1,6 +1,7 @@
 import Pow
 import SwiftUI
 import UIKit
+import Combine
 
 struct OnboardingFlow: View {
     @EnvironmentObject var appState: AppState
@@ -93,10 +94,7 @@ struct OnboardingFlow: View {
                 viewModel: viewModel,
                 finish: {
                     appState.userProfile = viewModel.userProfile
-                    appState.syncOnboardingProfile(
-                        profile: viewModel.userProfile,
-                        wantsPlacementTest: viewModel.wantsPlacementTest
-                    )
+                    appState.refreshTodayLesson()
                     appState.hasCompletedOnboarding = true
                 }
             )
@@ -258,6 +256,7 @@ private struct OnboardingSelectableCard<Content: View>: View {
 
 private struct OnboardingWelcomeView: View {
     let next: () -> Void
+    @State private var showBubble = false
     @State private var showFeatures = false
 
     private let features: [(icon: String, tint: Color, title: String, detail: String)] = [
@@ -306,6 +305,11 @@ private struct OnboardingWelcomeView: View {
             }
         }
         .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                withAnimation(LoopAnimation.springMedium) {
+                    showBubble = true
+                }
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
                 showFeatures = true
             }
@@ -314,33 +318,29 @@ private struct OnboardingWelcomeView: View {
 
     @ViewBuilder
     private var loopyCard: some View {
-        let bubble = LoopySpeechBubble(
-            primary: "Te guiare paso a paso para construir constancia real y progreso medible."
-        )
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
-                .fill(Color.loopSurf2.opacity(0.9))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
-                .stroke(Color.borderMid, lineWidth: 1)
-        )
-
         let content = ViewThatFits(in: .vertical) {
             HStack(alignment: .center, spacing: Spacing.md) {
                 LoopyView(mood: .speaking)
                     .scaleEffect(0.68)
                     .frame(width: 120, height: 130)
-                bubble
+                if showBubble {
+                    LoopyBubbleView(text: "Te guiare paso a paso para construir constancia real y progreso medible.")
+                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                } else {
+                    LoopyTypingDots()
+                }
             }
 
             VStack(alignment: .leading, spacing: Spacing.md) {
                 LoopyView(mood: .speaking)
                     .scaleEffect(0.68)
                     .frame(width: 120, height: 130)
-                bubble
+                if showBubble {
+                    LoopyBubbleView(text: "Te guiare paso a paso para construir constancia real y progreso medible.")
+                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                } else {
+                    LoopyTypingDots()
+                }
             }
         }
 
@@ -527,9 +527,11 @@ private struct OnboardingNameView: View {
             .frame(width: 66, height: 66)
             .scaleEffect(isSelected ? 1.06 : 1)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-            .loopSelectionBloom(isSelected: isSelected, tint: .coral, shape: .circle)
         }
         .buttonStyle(.plain)
+        .changeEffect(.spray(origin: UnitPoint.center) {
+            Image(systemName: "sparkle").foregroundColor(.coral)
+        }, value: isSelected, isEnabled: isSelected)
         .accessibilityLabel(Text("Avatar \(index + 1)"))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
     }
@@ -678,7 +680,7 @@ private struct AgeDialPicker: View {
                                         Text(title)
                                             .font(LoopFont.bold(13))
                                             .foregroundColor(Color.loopBG.opacity(0.72))
-                                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                            .transition(.asymmetric(insertion: .movingParts.pop, removal: .movingParts.poof))
                                     }
                                 }
                                 .animation(LoopAnimation.springBouncy, value: ageDescriptor.title)
@@ -882,12 +884,7 @@ private struct OnboardingGoalView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.coral)
-                                .transition(
-                                    .asymmetric(
-                                        insertion: .scale.combined(with: .opacity),
-                                        removal: .scale(scale: 0.4).combined(with: .opacity)
-                                    )
-                                )
+                                .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .movingParts.poof))
                         } else {
                             Image(systemName: "circle")
                                 .font(.system(size: 20))
@@ -897,9 +894,11 @@ private struct OnboardingGoalView: View {
                     .animation(LoopAnimation.springBouncy, value: isSelected)
                 }
             }
-            .loopSelectionBloom(isSelected: isSelected, tint: .coral, shape: .roundedRectangle(cornerRadius: Radius.lg))
         }
         .buttonStyle(.plain)
+        .changeEffect(.spray(origin: UnitPoint.center) {
+            Image(systemName: "sparkle").foregroundColor(.coral)
+        }, value: isSelected, isEnabled: isSelected)
     }
 }
 
@@ -923,12 +922,7 @@ private struct OnboardingLevelView: View {
 
             if viewModel.wantsPlacementTest {
                 placementExplainer
-                    .transition(
-                        .asymmetric(
-                            insertion: AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity),
-                            removal: .movingParts.poof
-                        )
-                    )
+                    .transition(AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity))
             }
 
             LoopCTA(title: "Continuar", trailingIcon: "arrow.right", style: .solid(.coral)) {
@@ -981,25 +975,18 @@ private struct OnboardingLevelView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.coral)
-                                .transition(
-                                    .asymmetric(
-                                        insertion: .scale.combined(with: .opacity),
-                                        removal: .scale(scale: 0.4).combined(with: .opacity)
-                                    )
-                                )
+                                .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .movingParts.poof))
                         }
                     }
                     .animation(LoopAnimation.springBouncy, value: isSelected)
                 }
             }
-            .loopSelectionBloom(
-                isSelected: isSelected && !viewModel.wantsPlacementTest,
-                tint: .amethyst,
-                shape: .roundedRectangle(cornerRadius: Radius.lg)
-            )
         }
         .buttonStyle(.plain)
         .disabled(viewModel.wantsPlacementTest)
+        .changeEffect(.spray(origin: UnitPoint.center) {
+            Image(systemName: "sparkle").foregroundColor(.amethyst)
+        }, value: isSelected, isEnabled: isSelected && !viewModel.wantsPlacementTest)
     }
 
     private var placementTestCard: some View {
@@ -1076,13 +1063,32 @@ private struct OnboardingLevelView: View {
 }
 
 private struct OnboardingTimeView: View {
+    @EnvironmentObject var appState: AppState
     @ObservedObject var viewModel: OnboardingViewModel
     private let minuteOptions = [5, 10, 15, 20, 30]
     private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+    @State private var showConfetti = false
+    @State private var confettiOpacity: Double = 1
     @State private var isGenerating = false
 
     private var weeklyMinutes: Int {
         viewModel.userProfile.minutesPerDay * viewModel.userProfile.activeDays.count
+    }
+
+    private var hasRealGeneratedPreview: Bool {
+        guard let course = appState.currentCourse else { return false }
+
+        let generatedTitle = (course.generatedCourseTitle ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        let generatedDescription = (course.generatedDescription ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let hasRealTitle = !generatedTitle.isEmpty && generatedTitle != "generando curso..."
+        let hasObjectives = !course.generatedObjectives.isEmpty
+        let hasDescription = !generatedDescription.isEmpty
+
+        return hasRealTitle && (hasObjectives || hasDescription)
     }
 
     var body: some View {
@@ -1162,7 +1168,15 @@ private struct OnboardingTimeView: View {
                 }
                 .buttonStyle(LoopCTAButton())
                 .disabled(viewModel.userProfile.activeDays.isEmpty || isGenerating)
-                .opacity(viewModel.userProfile.activeDays.isEmpty ? 0.55 : 1)
+                .opacity((viewModel.userProfile.activeDays.isEmpty || isGenerating) ? 0.55 : 1)
+            }
+
+            if showConfetti {
+                ConfettiLayer()
+                    .opacity(confettiOpacity)
+                    .allowsHitTesting(false)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
             }
 
             if isGenerating {
@@ -1179,11 +1193,43 @@ private struct OnboardingTimeView: View {
         HapticManager.shared.impact(.medium)
         isGenerating = true
         viewModel.generatePlan()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-            HapticManager.shared.success()
-            isGenerating = false
-            LoopToast.planReady()
-            viewModel.next()
+        appState.userProfile = viewModel.userProfile
+        appState.syncOnboardingProfile(
+            profile: viewModel.userProfile,
+            wantsPlacementTest: viewModel.wantsPlacementTest
+        )
+        withAnimation(.easeIn(duration: 0.1)) {
+            showConfetti = true
+            confettiOpacity = 1
+        }
+
+        Task {
+            await waitUntilGeneratedPreviewIsReady()
+
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.35)) {
+                    confettiOpacity = 0
+                }
+                HapticManager.shared.success()
+                showConfetti = false
+                isGenerating = false
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.85)) {
+                    viewModel.next()
+                }
+            }
+        }
+    }
+
+    private func waitUntilGeneratedPreviewIsReady() async {
+        while true {
+            let ready = await MainActor.run { hasRealGeneratedPreview }
+            if ready { return }
+
+            await MainActor.run {
+                appState.refreshTodayLesson()
+            }
+
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
         }
     }
 
@@ -1215,25 +1261,44 @@ private struct OnboardingTimeView: View {
 }
 
 private struct OnboardingPlanView: View {
+    @EnvironmentObject var appState: AppState
     @ObservedObject var viewModel: OnboardingViewModel
     let finish: () -> Void
     @State private var showReasons = false
+    private let refreshTicker = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
         let plan = viewModel.userProfile.generatedPlan ?? PlanGenerator.generatePlan(from: viewModel.userProfile)
-        OnboardingContainer(title: "Tu plan esta listo", subtitle: "Se genera al final del onboarding con tus datos reales.", eyebrow: "Plan IA") {
+        let course = appState.currentCourse
+        let headerTitle = course?.generatedCourseTitle ?? "\(plan.language.rawValue) · Modulo \(plan.startModule)"
+        let headerSubtitle = courseHeaderSubtitle(plan: plan, course: course)
+        let reasons = courseReasons(plan: plan, course: course)
+
+        OnboardingContainer(
+            title: "Tu plan esta listo",
+            subtitle: "Mostramos datos reales del agente mientras termina de generar tu curso.",
+            eyebrow: "Plan IA"
+        ) {
             LoopCard(accentColor: .amethyst, showsSceneAccent: true) {
                 VStack(alignment: .leading, spacing: Spacing.md) {
                     ViewThatFits(in: .vertical) {
                         HStack(alignment: .top) {
-                            planHeader(plan: plan)
+                            planHeader(title: headerTitle, subtitle: headerSubtitle)
                             Spacer()
-                            OnboardingMiniPill(icon: "sparkles", text: "Plan listo", tint: .amethyst)
+                            OnboardingMiniPill(
+                                icon: "sparkles",
+                                text: appState.isGeneratingCourse ? "Generando contenido" : "Plan listo",
+                                tint: appState.isGeneratingCourse ? .loopGold : .amethyst
+                            )
                         }
 
                         VStack(alignment: .leading, spacing: Spacing.sm) {
-                            planHeader(plan: plan)
-                            OnboardingMiniPill(icon: "sparkles", text: "Plan listo", tint: .amethyst)
+                            planHeader(title: headerTitle, subtitle: headerSubtitle)
+                            OnboardingMiniPill(
+                                icon: "sparkles",
+                                text: appState.isGeneratingCourse ? "Generando contenido" : "Plan listo",
+                                tint: appState.isGeneratingCourse ? .loopGold : .amethyst
+                            )
                         }
                     }
 
@@ -1241,13 +1306,21 @@ private struct OnboardingPlanView: View {
                         HStack(spacing: Spacing.sm) {
                             planMetric(title: "Ritmo", value: "\(viewModel.userProfile.minutesPerDay)m", tint: .coral)
                             planMetric(title: "Dias", value: "\(viewModel.userProfile.activeDays.count)", tint: .mint)
-                            planMetric(title: "Inicio", value: "M\(plan.startModule)", tint: .periwinkle)
+                            planMetric(
+                                title: "Modulos",
+                                value: "\(course?.generatedModulesCount ?? plan.startModule)",
+                                tint: .periwinkle
+                            )
                         }
 
                         VStack(spacing: Spacing.sm) {
                             planMetric(title: "Ritmo", value: "\(viewModel.userProfile.minutesPerDay)m", tint: .coral)
                             planMetric(title: "Dias", value: "\(viewModel.userProfile.activeDays.count)", tint: .mint)
-                            planMetric(title: "Inicio", value: "M\(plan.startModule)", tint: .periwinkle)
+                            planMetric(
+                                title: "Modulos",
+                                value: "\(course?.generatedModulesCount ?? plan.startModule)",
+                                tint: .periwinkle
+                            )
                         }
                     }
                 }
@@ -1259,7 +1332,7 @@ private struct OnboardingPlanView: View {
                     .foregroundColor(.textPrimary)
                     .padding(.bottom, Spacing.xs)
                 VStack(alignment: .leading, spacing: Spacing.sm) {
-                    ForEach(Array(plan.aiReasons.enumerated()), id: \.offset) { index, reason in
+                    ForEach(Array(reasons.enumerated()), id: \.offset) { index, reason in
                         HStack(alignment: .top, spacing: Spacing.sm) {
                             Circle().fill(Color.periwinkle).frame(width: 6, height: 6).padding(.top, 6)
                             Text(reason)
@@ -1275,10 +1348,10 @@ private struct OnboardingPlanView: View {
             }
 
             LoopCard(accentColor: .mint) {
-                Text("Tu primera semana")
+                Text("Introduccion del curso")
                     .font(LoopFont.bold(16))
                     .foregroundColor(.textPrimary)
-                Text("Vas a practicar \(viewModel.userProfile.minutesPerDay) minutos en \(viewModel.userProfile.activeDays.count) dias para construir ritmo antes de subir intensidad.")
+                Text(courseDescription(plan: plan, course: course))
                     .font(LoopFont.regular(13))
                     .foregroundColor(.textSecond)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1286,19 +1359,47 @@ private struct OnboardingPlanView: View {
 
             LoopCTA(title: "Comenzar", trailingIcon: "arrow.right", style: .solid(.coral)) { finish() }
         }
-        .onAppear { showReasons = true }
+        .onAppear {
+            showReasons = true
+            appState.refreshTodayLesson()
+        }
+        .onReceive(refreshTicker) { _ in
+            guard appState.isGeneratingCourse else { return }
+            appState.refreshTodayLesson()
+        }
     }
 
-    private func planHeader(plan: LearningPlan) -> some View {
+    private func planHeader(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("\(plan.language.rawValue) · Modulo \(plan.startModule)")
+            Text(title)
                 .font(LoopFont.bold(18))
                 .foregroundColor(.textPrimary)
-            Text("\(plan.dailyLessons) leccion diaria · \(plan.weeksEstimated) semanas estimadas")
+            Text(subtitle)
                 .font(LoopFont.regular(14))
                 .foregroundColor(.textSecond)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private func courseHeaderSubtitle(plan: LearningPlan, course: CourseStatusPayload?) -> String {
+        let lessons = course?.totalLessons ?? plan.dailyLessons
+        return "\(lessons) lecciones proyectadas · \(plan.weeksEstimated) semanas estimadas"
+    }
+
+    private func courseReasons(plan: LearningPlan, course: CourseStatusPayload?) -> [String] {
+        if let objectives = course?.generatedObjectives, !objectives.isEmpty {
+            return objectives
+        }
+        return plan.aiReasons
+    }
+
+    private func courseDescription(plan: LearningPlan, course: CourseStatusPayload?) -> String {
+        if let generatedDescription = course?.generatedDescription,
+           !generatedDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return generatedDescription
+        }
+
+        return "Vas a practicar \(viewModel.userProfile.minutesPerDay) minutos en \(viewModel.userProfile.activeDays.count) dias para construir ritmo antes de subir intensidad en \(plan.language.rawValue)."
     }
 
     private func planMetric(title: String, value: String, tint: Color) -> some View {
