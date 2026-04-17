@@ -31,6 +31,8 @@ struct LoopIdentityCard: View {
 
     @StateObject private var motion = LoopTiltMotionManager()
     @State private var isFlipped = false
+    @State private var accumulatedOffset: CGSize = .zero
+    @GestureState private var dragTranslation: CGSize = .zero
 
     private let avatars = ["person.circle.fill", "laptopcomputer", "terminal.fill", "cpu.fill", "gamecontroller.fill"]
 
@@ -45,17 +47,19 @@ struct LoopIdentityCard: View {
                 .rotation3DEffect(.degrees(isFlipped ? 0 : -180), axis: (x: 0, y: 1, z: 0))
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 248)
+        .frame(minHeight: 248)
+        .offset(liveOffset)
         .rotation3DEffect(.degrees(-motion.pitch * tiltMultiplier * 6), axis: (x: 1, y: 0, z: 0), perspective: 0.45)
         .rotation3DEffect(.degrees(motion.roll * tiltMultiplier * 8), axis: (x: 0, y: 1, z: 0), perspective: 0.45)
-        .shadow(color: accent.opacity(0.16), radius: 18, y: 10)
-        .shadow(color: .black.opacity(0.14), radius: 22, y: 14)
+        .shadow(color: accent.opacity(0.12 + (0.3 * userProfile.cardGlowStrength)), radius: 14 + (14 * userProfile.cardGlowStrength), y: 8 + (6 * userProfile.cardGlowStrength))
+        .shadow(color: .black.opacity(0.12), radius: 18, y: 10)
         .contentShape(RoundedRectangle(cornerRadius: Radius.xl))
         .onTapGesture {
             withAnimation(.spring(response: 0.52, dampingFraction: 0.84)) {
                 isFlipped.toggle()
             }
         }
+        .simultaneousGesture(cardDragGesture)
         .onAppear {
             if userProfile.cardMotionEnabled {
                 motion.start()
@@ -66,6 +70,13 @@ struct LoopIdentityCard: View {
                 motion.start()
             } else {
                 motion.stop()
+            }
+        }
+        .onChange(of: userProfile.cardDragEnabled) { _, isEnabled in
+            if !isEnabled {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                    accumulatedOffset = .zero
+                }
             }
         }
         .onDisappear { motion.stop() }
@@ -127,7 +138,7 @@ struct LoopIdentityCard: View {
                     }
                 }
 
-                Text("Toca la tarjeta para ver tu snapshot actual.")
+                Text(cardInteractionHint)
                     .font(LoopFont.semiBold(12))
                     .foregroundColor(.white.opacity(0.62))
             }
@@ -283,11 +294,7 @@ struct LoopIdentityCard: View {
             RoundedRectangle(cornerRadius: Radius.xl)
                 .fill(
                     LinearGradient(
-                        colors: [
-                            accent.opacity(0.96),
-                            secondaryAccent.opacity(0.84),
-                            Color.loopBG.opacity(0.98),
-                        ],
+                        colors: cardGradient,
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -295,15 +302,15 @@ struct LoopIdentityCard: View {
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: Radius.xl))
                 .overlay(
                     RoundedRectangle(cornerRadius: Radius.xl)
-                        .fill(Color.loopBG.opacity(0.2))
+                        .fill(Color.loopBG.opacity(surfaceDepthOpacity))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Radius.xl)
-                        .fill(Color.white.opacity(0.04))
+                        .fill(Color.white.opacity(surfaceHighlightOpacity))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: Radius.xl)
-                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                        .stroke(surfaceBorderColor, lineWidth: userProfile.cardSurface == .neon ? 1.35 : 1)
                 )
 
             RoundedRectangle(cornerRadius: Radius.xl)
@@ -317,7 +324,7 @@ struct LoopIdentityCard: View {
                 .blendMode(.screen)
 
             LoopSceneAccent(tint: .white.opacity(0.8))
-                .opacity(0.18)
+                .opacity(sceneAccentOpacity)
                 .padding(.top, -8)
                 .padding(.trailing, -4)
 
@@ -400,6 +407,41 @@ struct LoopIdentityCard: View {
         userProfile.cardMotionEnabled ? 1 : 0
     }
 
+    private var liveOffset: CGSize {
+        guard userProfile.cardDragEnabled else { return .zero }
+        return clampOffset(CGSize(width: accumulatedOffset.width + dragTranslation.width, height: accumulatedOffset.height + dragTranslation.height))
+    }
+
+    private var cardDragGesture: some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .local)
+            .updating($dragTranslation) { value, state, _ in
+                guard userProfile.cardDragEnabled else { return }
+                state = value.translation
+            }
+            .onEnded { value in
+                guard userProfile.cardDragEnabled else {
+                    accumulatedOffset = .zero
+                    return
+                }
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
+                    accumulatedOffset = clampOffset(
+                        CGSize(
+                            width: accumulatedOffset.width + value.translation.width,
+                            height: accumulatedOffset.height + value.translation.height
+                        )
+                    )
+                }
+            }
+    }
+
+    private func clampOffset(_ value: CGSize) -> CGSize {
+        let maxOffset: CGFloat = 34
+        return CGSize(
+            width: min(max(value.width, -maxOffset), maxOffset),
+            height: min(max(value.height, -maxOffset), maxOffset)
+        )
+    }
+
     private var avatarSymbol: String {
         let index = min(max(userProfile.avatarIndex, 0), avatars.count - 1)
         return avatars[index]
@@ -443,6 +485,68 @@ struct LoopIdentityCard: View {
         "Estas construyendo una identidad de \(identityTitle.lowercased()) con badge \(userProfile.cardBadge.rawValue.lowercased()), \(userProfile.minutesPerDay) minutos por sesion y una racha de \(gameState.currentStreak) dias."
     }
 
+    private var cardInteractionHint: String {
+        if userProfile.cardDragEnabled {
+            return "Toca para girarla y arrastrala con el dedo para moverla."
+        }
+        return "Toca la tarjeta para ver tu snapshot actual."
+    }
+
+    private var cardGradient: [Color] {
+        switch userProfile.cardSurface {
+        case .glass:
+            return [accent.opacity(0.96), secondaryAccent.opacity(0.84), Color.loopBG.opacity(0.98)]
+        case .neon:
+            return [accent.opacity(1), secondaryAccent.opacity(0.95), Color.loopBG.opacity(0.92)]
+        case .stealth:
+            return [Color.loopSurf2.opacity(0.94), accent.opacity(0.42), Color.loopBG.opacity(0.99)]
+        }
+    }
+
+    private var surfaceBorderColor: Color {
+        switch userProfile.cardSurface {
+        case .glass:
+            return Color.white.opacity(0.14)
+        case .neon:
+            return accent.opacity(0.58 + (0.35 * userProfile.cardGlowStrength))
+        case .stealth:
+            return Color.white.opacity(0.09)
+        }
+    }
+
+    private var surfaceDepthOpacity: Double {
+        switch userProfile.cardSurface {
+        case .glass:
+            return 0.2
+        case .neon:
+            return 0.14
+        case .stealth:
+            return 0.32
+        }
+    }
+
+    private var surfaceHighlightOpacity: Double {
+        switch userProfile.cardSurface {
+        case .glass:
+            return 0.04
+        case .neon:
+            return 0.08 + (0.08 * userProfile.cardGlowStrength)
+        case .stealth:
+            return 0.025
+        }
+    }
+
+    private var sceneAccentOpacity: Double {
+        switch userProfile.cardSurface {
+        case .glass:
+            return 0.18
+        case .neon:
+            return 0.24 + (0.18 * userProfile.cardGlowStrength)
+        case .stealth:
+            return 0.1
+        }
+    }
+
     private var accent: Color {
         switch userProfile.cardPalette {
         case .coral:
@@ -451,6 +555,10 @@ struct LoopIdentityCard: View {
             return .mint
         case .midnight:
             return .periwinkle
+        case .sunset:
+            return .loopGold
+        case .ocean:
+            return .cerulean
         }
     }
 
@@ -462,6 +570,10 @@ struct LoopIdentityCard: View {
             return .cerulean
         case .midnight:
             return .loopGold
+        case .sunset:
+            return .coral
+        case .ocean:
+            return .mint
         }
     }
 }

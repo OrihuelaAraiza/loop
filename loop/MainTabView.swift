@@ -11,13 +11,13 @@ struct MainTabView: View {
             Group {
                 switch selected {
                 case .home:
-                    HomeView()
+                    HomeView(onStartLesson: { showExercise = true })
                         .environmentObject(appState)
-                        .onTapGesture(count: 2) { showExercise = true }
+                case .routes:
+                    RoutesView()
+                        .environmentObject(appState)
                 case .map:
                     MapView()
-                case .challenges:
-                    ChallengesView()
                 case .profile:
                     ProfileView()
                         .environmentObject(appState)
@@ -40,25 +40,10 @@ struct MainTabView: View {
     }
 }
 
-private struct ChallengesView: View {
-    var body: some View {
-        ZStack {
-            AmbientBackground(topColor: .amethyst, bottomColor: .cerulean)
-            LoopCard(accentColor: .loopGold, usesGlassSurface: true) {
-                Text("Leaderboard y retos semanales")
-                    .font(LoopFont.bold(18))
-                    .foregroundColor(.textPrimary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(Spacing.lg)
-        }
-    }
-}
-
 private struct ProfileView: View {
     @EnvironmentObject var appState: AppState
-    @State private var showsCustomizer = false
+    @State private var showCustomizerSheet = false
+    @State private var showSettingsSheet = false
 
     var body: some View {
         ZStack {
@@ -66,36 +51,44 @@ private struct ProfileView: View {
             ScrollView {
                 VStack(spacing: Spacing.lg) {
                     VStack(alignment: .leading, spacing: Spacing.lg) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Perfil")
-                                .font(LoopFont.black(28))
-                                .foregroundColor(.textPrimary)
-                            Text("Tu tarjeta vive aqui. Tocala para girarla o editala desde el boton interno.")
-                                .font(LoopFont.regular(13))
-                                .foregroundColor(.textSecond)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(alignment: .top, spacing: Spacing.md) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Perfil")
+                                    .font(LoopFont.black(28))
+                                    .foregroundColor(.textPrimary)
+                                Text("Tu tarjeta vive aqui. Tocala para girarla, arrastrarla y abre ajustes desde Editar.")
+                                    .font(LoopFont.regular(13))
+                                    .foregroundColor(.textSecond)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                        ZStack {
-                            Color.clear
-                                .frame(height: 328)
-
-                            LoopIdentityCard(
-                                userProfile: appState.userProfile,
-                                gameState: appState.gameState,
-                                isCustomizerPresented: showsCustomizer,
-                                onCustomize: {
-                                    withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
-                                        showsCustomizer.toggle()
-                                    }
-                                }
-                            )
-                            .padding(.horizontal, 4)
-                            .padding(.top, 14)
-                            .padding(.bottom, 24)
+                            Button {
+                                showSettingsSheet = true
+                            } label: {
+                                Image(systemName: "gearshape.fill")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.textPrimary)
+                                    .frame(width: 40, height: 40)
+                                    .background(Color.loopSurf2.opacity(0.9))
+                                    .clipShape(Circle())
+                                    .overlay(Circle().stroke(Color.borderMid, lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Ajustes")
                         }
+
+                        LoopIdentityCard(
+                            userProfile: appState.userProfile,
+                            gameState: appState.gameState,
+                            isCustomizerPresented: showCustomizerSheet,
+                            onCustomize: {
+                                showCustomizerSheet = true
+                            }
+                        )
+                        .padding(.horizontal, 4)
                         .padding(.top, 6)
+                        .padding(.bottom, 6)
                     }
 
                     ViewThatFits(in: .vertical) {
@@ -108,11 +101,6 @@ private struct ProfileView: View {
                             statCard(title: "Nivel", value: "\(appState.gameState.level)", tint: .periwinkle)
                             statCard(title: "XP total", value: "\(appState.gameState.totalXP)", tint: .loopGold)
                         }
-                    }
-
-                    if showsCustomizer {
-                        customizationPanel
-                            .transition(.move(edge: .top).combined(with: .opacity))
                     }
 
                     LoopCard(accentColor: .cerulean, showsSceneAccent: true, usesGlassSurface: true) {
@@ -131,6 +119,22 @@ private struct ProfileView: View {
                 .padding(.top, Spacing.xl)
                 .padding(.bottom, 90)
             }
+        }
+        .sheet(isPresented: $showCustomizerSheet) {
+            ProfileCustomizationSheet(
+                userProfile: Binding(
+                    get: { appState.userProfile },
+                    set: { appState.userProfile = $0 }
+                )
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showSettingsSheet) {
+            SettingsSheet()
+                .environmentObject(appState)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -153,82 +157,117 @@ private struct ProfileView: View {
         let language = appState.userProfile.generatedPlan?.language.rawValue ?? "Python"
         return "\(displayName) esta en ruta de \(appState.userProfile.goal.rawValue.lowercased()), practicando \(appState.userProfile.minutesPerDay) minutos por sesion en \(language)."
     }
+}
 
-    private var customizationPanel: some View {
-        LoopCard(accentColor: customizationTint, usesGlassSurface: true) {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                compactSection(title: "Paleta") {
-                    HStack(spacing: Spacing.sm) {
-                        ForEach(IdentityCardPalette.allCases) { palette in
-                            Button {
-                                appState.userProfile.cardPalette = palette
-                            } label: {
-                                paletteSwatch(palette)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                compactSection(title: "Badge") {
-                    ViewThatFits {
-                        HStack(spacing: Spacing.sm) {
-                            ForEach(IdentityCardBadge.allCases) { badge in
-                                Button {
-                                    appState.userProfile.cardBadge = badge
-                                } label: {
-                                    capsuleOption(
-                                        badge.rawValue,
-                                        isSelected: appState.userProfile.cardBadge == badge,
-                                        tint: badgeTint(for: badge)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
-                            ForEach(IdentityCardBadge.allCases) { badge in
-                                Button {
-                                    appState.userProfile.cardBadge = badge
-                                } label: {
-                                    capsuleOption(
-                                        badge.rawValue,
-                                        isSelected: appState.userProfile.cardBadge == badge,
-                                        tint: badgeTint(for: badge)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-                }
-
-                HStack(spacing: Spacing.md) {
-                    Text("Movimiento 3D")
-                        .font(LoopFont.semiBold(13))
-                        .foregroundColor(.textPrimary)
-                    Spacer()
-                    Toggle(
-                        "",
-                        isOn: Binding(
-                            get: { appState.userProfile.cardMotionEnabled },
-                            set: { appState.userProfile.cardMotionEnabled = $0 }
-                        )
-                    )
-                    .labelsHidden()
-                    .tint(customizationTint)
-                }
-            }
-        }
-    }
+private struct ProfileCustomizationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var userProfile: UserProfile
 
     private func compactSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(LoopFont.semiBold(12))
+                .font(LoopFont.semiBold(13))
                 .foregroundColor(.textSecond)
             content()
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            AmbientBackground(topColor: .amethyst, bottomColor: .cerulean)
+            ScrollView {
+                VStack(spacing: Spacing.lg) {
+                    header
+
+                    LoopCard(accentColor: customizationTint, usesGlassSurface: true) {
+                        VStack(alignment: .leading, spacing: Spacing.md) {
+                            compactSection(title: "Paleta") {
+                                HStack(spacing: Spacing.sm) {
+                                    ForEach(IdentityCardPalette.allCases) { palette in
+                                        Button {
+                                            userProfile.cardPalette = palette
+                                        } label: {
+                                            paletteSwatch(palette)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+
+                            compactSection(title: "Badge") {
+                                chipGrid(
+                                    options: IdentityCardBadge.allCases.map(\.rawValue),
+                                    selected: userProfile.cardBadge.rawValue,
+                                    tintResolver: badgeTint(label:)
+                                ) { value in
+                                    if let badge = IdentityCardBadge.allCases.first(where: { $0.rawValue == value }) {
+                                        userProfile.cardBadge = badge
+                                    }
+                                }
+                            }
+
+                            compactSection(title: "Superficie") {
+                                chipGrid(
+                                    options: IdentityCardSurface.allCases.map(\.rawValue),
+                                    selected: userProfile.cardSurface.rawValue,
+                                    tintResolver: { _ in customizationTint }
+                                ) { value in
+                                    if let surface = IdentityCardSurface.allCases.first(where: { $0.rawValue == value }) {
+                                        userProfile.cardSurface = surface
+                                    }
+                                }
+                            }
+
+                            compactSection(title: "Avatar") {
+                                avatarSelector
+                            }
+
+                            compactSection(title: "Brillo") {
+                                VStack(alignment: .leading, spacing: Spacing.xs) {
+                                    Slider(value: $userProfile.cardGlowStrength, in: 0.1 ... 1, step: 0.05)
+                                        .tint(customizationTint)
+                                    Text("\(Int(userProfile.cardGlowStrength * 100))%")
+                                        .font(LoopFont.medium(11))
+                                        .foregroundColor(.textSecond)
+                                }
+                            }
+
+                            toggleRow(title: "Movimiento 3D", isOn: $userProfile.cardMotionEnabled)
+                            toggleRow(title: "Arrastrar card", isOn: $userProfile.cardDragEnabled)
+                        }
+                    }
+                }
+                .padding(Spacing.lg)
+                .padding(.bottom, 18)
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Ajustes de tarjeta")
+                    .font(LoopFont.black(24))
+                    .foregroundColor(.textPrimary)
+                Text("Personaliza estilo, interacciones y look de tu card 3D.")
+                    .font(LoopFont.regular(13))
+                    .foregroundColor(.textSecond)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button("Listo") {
+                dismiss()
+            }
+            .font(LoopFont.bold(13))
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, 8)
+            .background(Color.loopSurf2.opacity(0.9))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.borderMid, lineWidth: 1)
+            )
+            .buttonStyle(.plain)
         }
     }
 
@@ -244,15 +283,88 @@ private struct ProfileView: View {
                 )
                 .overlay(
                     Circle()
-                        .stroke(appState.userProfile.cardPalette == palette ? paletteTint(for: palette) : Color.borderSoft, lineWidth: 1.4)
+                        .stroke(userProfile.cardPalette == palette ? paletteTint(for: palette) : Color.borderSoft, lineWidth: 1.4)
                 )
 
             Text(palette.rawValue)
                 .font(LoopFont.medium(12))
-                .foregroundColor(appState.userProfile.cardPalette == palette ? .textPrimary : .textSecond)
+                .foregroundColor(userProfile.cardPalette == palette ? .textPrimary : .textSecond)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
+    }
+
+    private var avatarSelector: some View {
+        let avatars = ["person.circle.fill", "laptopcomputer", "terminal.fill", "cpu.fill", "gamecontroller.fill"]
+        return ViewThatFits(in: .vertical) {
+            HStack(spacing: Spacing.sm) {
+                ForEach(Array(avatars.enumerated()), id: \.offset) { index, symbol in
+                    avatarButton(index: index, symbol: symbol)
+                }
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Spacing.sm) {
+                    ForEach(Array(avatars.enumerated()), id: \.offset) { index, symbol in
+                        avatarButton(index: index, symbol: symbol)
+                    }
+                }
+            }
+        }
+    }
+
+    private func avatarButton(index: Int, symbol: String) -> some View {
+        Button {
+            userProfile.avatarIndex = index
+        } label: {
+            Circle()
+                .fill(userProfile.avatarIndex == index ? customizationTint.opacity(0.18) : Color.loopSurf2.opacity(0.9))
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Image(systemName: symbol)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(userProfile.avatarIndex == index ? .white : .periwinkle)
+                )
+                .overlay(
+                    Circle()
+                        .stroke(userProfile.avatarIndex == index ? customizationTint.opacity(0.56) : Color.borderSoft, lineWidth: 1.3)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func chipGrid(options: [String], selected: String, tintResolver: @escaping (String) -> Color, onSelect: @escaping (String) -> Void) -> some View {
+        ViewThatFits {
+            HStack(spacing: Spacing.sm) {
+                ForEach(options, id: \.self) { option in
+                    Button {
+                        onSelect(option)
+                    } label: {
+                        capsuleOption(
+                            option,
+                            isSelected: selected == option,
+                            tint: tintResolver(option)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                ForEach(options, id: \.self) { option in
+                    Button {
+                        onSelect(option)
+                    } label: {
+                        capsuleOption(
+                            option,
+                            isSelected: selected == option,
+                            tint: tintResolver(option)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 
     private func capsuleOption(_ title: String, isSelected: Bool, tint: Color) -> some View {
@@ -271,6 +383,18 @@ private struct ProfileView: View {
             )
     }
 
+    private func toggleRow(title: String, isOn: Binding<Bool>) -> some View {
+        HStack(spacing: Spacing.md) {
+            Text(title)
+                .font(LoopFont.semiBold(13))
+                .foregroundColor(.textPrimary)
+            Spacer()
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(customizationTint)
+        }
+    }
+
     private func paletteTint(for palette: IdentityCardPalette) -> Color {
         switch palette {
         case .coral:
@@ -279,21 +403,32 @@ private struct ProfileView: View {
             return .mint
         case .midnight:
             return .periwinkle
+        case .sunset:
+            return .loopGold
+        case .ocean:
+            return .cerulean
         }
     }
 
-    private func badgeTint(for badge: IdentityCardBadge) -> Color {
-        switch badge {
-        case .creador:
+    private func badgeTint(label: String) -> Color {
+        switch label {
+        case IdentityCardBadge.creador.rawValue:
             return .coral
-        case .enfoque:
+        case IdentityCardBadge.enfoque.rawValue:
             return .cerulean
-        case .racha:
+        case IdentityCardBadge.racha.rawValue:
             return .loopGold
+        case IdentityCardBadge.mentor.rawValue:
+            return .mint
+        case IdentityCardBadge.ninja.rawValue:
+            return .amethyst
+        default:
+            return customizationTint
         }
     }
 
     private var customizationTint: Color {
-        paletteTint(for: appState.userProfile.cardPalette)
+        paletteTint(for: userProfile.cardPalette)
     }
 }
+

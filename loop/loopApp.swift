@@ -13,13 +13,20 @@ struct loopApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if appState.hasCompletedOnboarding {
-                MainTabView()
-                    .environmentObject(appState)
-            } else {
-                OnboardingFlow()
-                    .environmentObject(appState)
+            Group {
+                if !appState.isSignedIn {
+                    AuthView()
+                        .environmentObject(appState)
+                } else if appState.hasCompletedOnboarding {
+                    MainTabView()
+                        .environmentObject(appState)
+                } else {
+                    OnboardingFlow()
+                        .environmentObject(appState)
+                }
             }
+            .animation(.easeInOut, value: appState.isSignedIn)
+            .animation(.easeInOut, value: appState.hasCompletedOnboarding)
         }
     }
 }

@@ -9,6 +9,7 @@ struct OnboardingFlow: View {
     var body: some View {
         ZStack {
             AmbientBackground(topColor: .amethyst, bottomColor: .cerulean)
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 header
@@ -17,6 +18,16 @@ struct OnboardingFlow: View {
                     .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .trailing)), removal: .opacity))
             }
             .animation(.spring(response: 0.45, dampingFraction: 0.88), value: viewModel.step)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Listo") {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
+                .font(LoopFont.bold(14))
+                .foregroundColor(.coral)
+            }
         }
     }
 
@@ -164,6 +175,7 @@ private struct OnboardingContainer<Content: View>: View {
                 .padding(.top, Spacing.sm)
                 .padding(.bottom, Spacing.section)
             }
+            .scrollDismissesKeyboard(.interactively)
             .padding(.horizontal, Spacing.xl)
         }
     }
@@ -354,7 +366,11 @@ private struct OnboardingNameView: View {
                         .font(LoopFont.medium(17))
                         .foregroundColor(.textPrimary)
                         .textInputAutocapitalization(.words)
-                        .submitLabel(.continue)
+                        .autocorrectionDisabled(true)
+                        .submitLabel(.done)
+                        .onSubmit {
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        }
                         .padding(.horizontal, Spacing.md)
                         .padding(.vertical, 14)
                         .background(Color.loopSurf2.opacity(0.82))

@@ -5,9 +5,15 @@ struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
     @State private var revealCards = false
 
+    var onStartLesson: () -> Void = {}
+
     private let dayLabels = ["L", "M", "X", "J", "V", "S", "D"]
     private var learnerName: String {
         appState.userProfile.name.isEmpty ? "coder" : appState.userProfile.name
+    }
+
+    private var activeCourse: CourseItem? {
+        viewModel.courses.first(where: { $0.isActive }) ?? viewModel.courses.first
     }
 
     var body: some View {
@@ -19,13 +25,9 @@ struct HomeView: View {
                         .padding(.top, Spacing.sm)
                     loopyCard
                         .transition(.opacity.combined(with: .move(edge: .top)))
-                    streakTracker
+                    lessonCTA
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    dailyGoal
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    progressSplit
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    courseList
+                    dashboardSection
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
                 .padding(.horizontal, Spacing.lg)
@@ -40,30 +42,16 @@ struct HomeView: View {
     }
 
     private var topBar: some View {
-        VStack(alignment: .leading, spacing: Spacing.md) {
-            ViewThatFits(in: .vertical) {
-                HStack(alignment: .top) {
-                    brandLockup
-                    Spacer()
-                    statsCluster
-                }
-
-                VStack(alignment: .leading, spacing: Spacing.sm) {
-                    brandLockup
-                    statsCluster
-                }
+        ViewThatFits(in: .vertical) {
+            HStack(alignment: .center) {
+                brandLockup
+                Spacer()
+                statsCluster
             }
 
-            ViewThatFits(in: .vertical) {
-                HStack(spacing: Spacing.sm) {
-                    homePill(icon: "bolt.fill", text: "Ruta activa")
-                    homePill(icon: "clock.fill", text: "\(appState.userProfile.minutesPerDay)m")
-                }
-
-                VStack(alignment: .leading, spacing: Spacing.sm) {
-                    homePill(icon: "bolt.fill", text: "Ruta activa")
-                    homePill(icon: "clock.fill", text: "\(appState.userProfile.minutesPerDay)m")
-                }
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                brandLockup
+                statsCluster
             }
         }
     }
@@ -71,21 +59,12 @@ struct HomeView: View {
     private var loopyCard: some View {
         LoopCard(accentColor: .amethyst, showsSceneAccent: true, usesGlassSurface: true) {
             VStack(alignment: .leading, spacing: Spacing.md) {
-                ViewThatFits(in: .vertical) {
-                    HStack {
-                        homePill(icon: "sparkles", text: "Mentor del dia")
-                        Spacer()
-                        Text("Racha \(appState.gameState.currentStreak)")
-                            .font(LoopFont.bold(12))
-                            .foregroundColor(.loopGold)
-                    }
-
-                    VStack(alignment: .leading, spacing: Spacing.sm) {
-                        homePill(icon: "sparkles", text: "Mentor del dia")
-                        Text("Racha \(appState.gameState.currentStreak)")
-                            .font(LoopFont.bold(12))
-                            .foregroundColor(.loopGold)
-                    }
+                HStack {
+                    homePill(icon: "sparkles", text: "Mentor del dia")
+                    Spacer()
+                    Text("Racha \(appState.gameState.currentStreak)")
+                        .font(LoopFont.bold(12))
+                        .foregroundColor(.loopGold)
                 }
 
                 HStack(alignment: .center, spacing: Spacing.md) {
@@ -98,27 +77,53 @@ struct HomeView: View {
                             .font(LoopFont.bold(16))
                             .foregroundColor(.textPrimary)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Hoy toca cerrar el modulo de listas y sumar una victoria rapida.")
+                        Text("Tu leccion del dia esta lista, cuando quieras empezar.")
                             .font(LoopFont.regular(13))
                             .foregroundColor(.textSecond)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+            }
+        }
+    }
 
-                ViewThatFits(in: .vertical) {
-                    HStack(spacing: Spacing.sm) {
-                        homePill(icon: "flag.fill", text: "Meta: modulo de listas")
-                        homePill(icon: "arrow.right.circle.fill", text: "Doble tap para entrar")
+    private var lessonCTA: some View {
+        Button(action: onStartLesson) {
+            LoopCard(accentColor: .coral, showsSceneAccent: true, usesGlassSurface: true) {
+                HStack(alignment: .center, spacing: Spacing.md) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.coral.opacity(0.22))
+                            .frame(width: 52, height: 52)
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.coral)
                     }
 
-                    VStack(alignment: .leading, spacing: Spacing.sm) {
-                        homePill(icon: "flag.fill", text: "Meta: modulo de listas")
-                        homePill(icon: "arrow.right.circle.fill", text: "Doble tap para entrar")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Leccion del dia")
+                            .font(LoopFont.bold(17))
+                            .foregroundColor(.textPrimary)
+                        Text(activeCourse.map { "\($0.title) · \($0.module)" } ?? "Empieza tu practica de hoy")
+                            .font(LoopFont.regular(13))
+                            .foregroundColor(.textSecond)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.coral)
+                        .padding(10)
+                        .background(Color.coral.opacity(0.16))
+                        .clipShape(Circle())
                 }
             }
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Empezar leccion del dia")
     }
 
     private var streakTracker: some View {
@@ -215,117 +220,38 @@ struct HomeView: View {
         }
     }
 
-    private var courseList: some View {
+    private var dashboardSection: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Rutas activas")
-                    .font(LoopFont.bold(20))
-                    .foregroundColor(.textPrimary)
-                Text("Lo que tienes en foco ahora y lo que sigue en la cola.")
-                    .font(LoopFont.regular(13))
-                    .foregroundColor(.textSecond)
-            }
+            sectionHeader(
+                title: "Resumen de hoy",
+                subtitle: "Tu racha, avance diario y progreso del sprint en un solo bloque."
+            )
 
-            ForEach(viewModel.courses) { course in
-                LoopCard(accentColor: course.isActive ? .coral : .clear, usesGlassSurface: true) {
-                    ViewThatFits(in: .vertical) {
-                        HStack(alignment: .center, spacing: Spacing.md) {
-                            courseLeading(course: course)
-                            Spacer()
-                            courseStars(course: course)
-                        }
-
-                        VStack(alignment: .leading, spacing: Spacing.md) {
-                            HStack(alignment: .center, spacing: Spacing.md) {
-                                courseLeading(course: course)
-                            }
-                            courseStars(course: course)
-                        }
-                    }
-                }
-                .scaleEffect(revealCards ? 1 : 0.98)
-                .opacity(revealCards ? 1 : 0)
-            }
+            streakTracker
+            dailyGoal
+            progressSplit
         }
     }
 
-    private func courseLeading(course: CourseItem) -> some View {
-        HStack(alignment: .center, spacing: Spacing.md) {
-            Circle()
-                .fill(course.isActive ? Color.coral.opacity(0.22) : Color.loopSurf3)
-                .frame(width: 42, height: 42)
-                .overlay(
-                    Image(systemName: course.isActive ? "play.fill" : "pause.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(course.isActive ? .white : .periwinkle)
-                )
-
-            VStack(alignment: .leading, spacing: 4) {
-                ViewThatFits(in: .vertical) {
-                    HStack(spacing: 6) {
-                        Text(course.title)
-                            .font(LoopFont.bold(14))
-                            .foregroundColor(.textPrimary)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text(course.isActive ? "En foco" : "En cola")
-                            .font(LoopFont.bold(10))
-                            .foregroundColor(course.isActive ? .coral : .textSecond)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background((course.isActive ? Color.coral : Color.loopSurf3).opacity(0.16))
-                            .clipShape(Capsule())
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(course.title)
-                            .font(LoopFont.bold(14))
-                            .foregroundColor(.textPrimary)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text(course.isActive ? "En foco" : "En cola")
-                            .font(LoopFont.bold(10))
-                            .foregroundColor(course.isActive ? .coral : .textSecond)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background((course.isActive ? Color.coral : Color.loopSurf3).opacity(0.16))
-                            .clipShape(Capsule())
-                    }
-                }
-
-                Text(course.module)
-                    .font(LoopFont.regular(12))
-                    .foregroundColor(.textSecond)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private func courseStars(course: CourseItem) -> some View {
-        HStack(spacing: 2) {
-            ForEach(0 ..< 3, id: \.self) { index in
-                Image(systemName: "star.fill")
-                    .font(.system(size: 11))
-                    .foregroundColor(index < course.stars ? .loopGold : .textMuted)
-            }
+    private func sectionHeader(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            Text(title)
+                .font(LoopFont.bold(20))
+                .foregroundColor(.textPrimary)
+            Text(subtitle)
+                .font(LoopFont.regular(13))
+                .foregroundColor(.textSecond)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var brandLockup: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("loop")
-                .font(LoopFont.black(34))
-                .foregroundColor(.textPrimary)
-                .overlay(alignment: .trailing) {
-                    Circle().fill(Color.coral).frame(width: 9, height: 9).offset(x: 8, y: 4)
-                }
-
-            Text("Tu sprint de hoy")
-                .font(LoopFont.regular(13))
-                .foregroundColor(.textSecond)
-        }
+        Text("loop")
+            .font(LoopFont.black(34))
+            .foregroundColor(.textPrimary)
+            .overlay(alignment: .trailing) {
+                Circle().fill(Color.coral).frame(width: 9, height: 9).offset(x: 8, y: 4)
+            }
     }
 
     private var statsCluster: some View {
@@ -336,15 +262,12 @@ struct HomeView: View {
     }
 
     private func homePill(icon: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .center, spacing: 6) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .bold))
             Text(text)
                 .font(LoopFont.bold(12))
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .layoutPriority(1)
+                .lineLimit(1)
         }
         .foregroundColor(.periwinkle)
         .padding(.horizontal, Spacing.md)

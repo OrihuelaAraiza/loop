@@ -2,15 +2,15 @@ import SwiftUI
 
 enum MainTab: Int, CaseIterable {
     case home
+    case routes
     case map
-    case challenges
     case profile
 
     var title: String {
         switch self {
         case .home: return "Inicio"
+        case .routes: return "Rutas"
         case .map: return "Mapa"
-        case .challenges: return "Retos"
         case .profile: return "Perfil"
         }
     }
@@ -18,8 +18,8 @@ enum MainTab: Int, CaseIterable {
     var icon: String {
         switch self {
         case .home: return "house.fill"
+        case .routes: return "bolt.fill"
         case .map: return "map.fill"
-        case .challenges: return "trophy.fill"
         case .profile: return "person.crop.circle.fill"
         }
     }

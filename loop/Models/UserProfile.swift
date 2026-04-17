@@ -53,6 +53,8 @@ enum IdentityCardPalette: String, Codable, CaseIterable, Identifiable {
     case coral = "Coral"
     case aurora = "Aurora"
     case midnight = "Midnight"
+    case sunset = "Sunset"
+    case ocean = "Ocean"
     var id: String { rawValue }
 }
 
@@ -60,6 +62,15 @@ enum IdentityCardBadge: String, Codable, CaseIterable, Identifiable {
     case creador = "Creador"
     case enfoque = "Enfoque"
     case racha = "Racha"
+    case mentor = "Mentor"
+    case ninja = "Ninja"
+    var id: String { rawValue }
+}
+
+enum IdentityCardSurface: String, Codable, CaseIterable, Identifiable {
+    case glass = "Glass"
+    case neon = "Neon"
+    case stealth = "Stealth"
     var id: String { rawValue }
 }
 
@@ -79,5 +90,8 @@ struct UserProfile: Codable {
     var cardPalette: IdentityCardPalette = .coral
     var cardBadge: IdentityCardBadge = .creador
     var cardMotionEnabled = true
+    var cardDragEnabled = true
+    var cardSurface: IdentityCardSurface = .glass
+    var cardGlowStrength: Double = 0.55
     var generatedPlan: LearningPlan?
 }
