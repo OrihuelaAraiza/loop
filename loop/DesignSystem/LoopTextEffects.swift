@@ -28,7 +28,7 @@ struct WordByWordRenderer: TextRenderer, Animatable {
         for line in layout {
             for run in line {
                 for glyph in run {
-                    let delay = Double(index) / Double(total) * totalDuration
+                    let delay = Double(index) / Double(total) * max(0, totalDuration - wordDuration)
                     let localTime = max(0, elapsedTime - delay)
                     let progress = min(1.0, localTime / wordDuration)
                     let yOffset = (1.0 - progress) * 8.0
