@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/JP/Desktop/loop/loop -name \"*.swift\" ! -path \"*/.claude/*\" -exec grep -l \"Color\\\\.\" {} \\\\;)",
+      "Bash(cat)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

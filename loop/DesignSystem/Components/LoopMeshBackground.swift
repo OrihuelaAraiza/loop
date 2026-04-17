@@ -3,10 +3,6 @@ import SwiftUI
 struct LoopMeshBackground: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let prussian = Color(hex: "191D32")
-    private let amethyst = Color(hex: "9649CB")
-    private let coral = Color(hex: "EE6352")
-
     var body: some View {
         ZStack {
             Group {
@@ -44,9 +40,9 @@ struct LoopMeshBackground: View {
                     SIMD2<Float>(0, 1), SIMD2<Float>(0.5, 1), SIMD2<Float>(1, 1)
                 ],
                 colors: [
-                    prussian, prussian, prussian,
-                    prussian, amethyst.opacity(0.18), prussian,
-                    prussian, coral.opacity(0.1), prussian
+                    .loopBG, .loopBG, .loopBG,
+                    .loopBG, Color.amethyst.opacity(0.22), .loopBG,
+                    .loopBG, Color.coral.opacity(0.14), .loopBG
                 ]
             )
         }
@@ -64,9 +60,9 @@ struct LoopMeshBackground: View {
                 SIMD2<Float>(0, 1), SIMD2<Float>(0.5, 1), SIMD2<Float>(1, 1)
             ],
             colors: [
-                prussian, prussian, prussian,
-                prussian, amethyst.opacity(0.15), prussian,
-                prussian, coral.opacity(0.08), prussian
+                .loopBG, .loopBG, .loopBG,
+                .loopBG, Color.amethyst.opacity(0.18), .loopBG,
+                .loopBG, Color.coral.opacity(0.10), .loopBG
             ]
         )
         .drawingGroup()
@@ -74,15 +70,15 @@ struct LoopMeshBackground: View {
 
     private var fallbackGradient: some View {
         ZStack {
-            prussian
+            Color.loopBG
             RadialGradient(
-                colors: [amethyst.opacity(0.18), .clear],
+                colors: [Color.amethyst.opacity(0.20), .clear],
                 center: .center,
                 startRadius: 0,
                 endRadius: 280
             )
             RadialGradient(
-                colors: [coral.opacity(0.1), .clear],
+                colors: [Color.coral.opacity(0.12), .clear],
                 center: .bottom,
                 startRadius: 0,
                 endRadius: 260

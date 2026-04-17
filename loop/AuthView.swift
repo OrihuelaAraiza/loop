@@ -9,6 +9,9 @@ struct AuthView: View {
     @State private var reveal = false
     @State private var heroPulse = false
     @State private var benefitsReveal = false
+    @State private var blob1 = false
+    @State private var blob2 = false
+    @State private var blob3 = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -46,6 +49,15 @@ struct AuthView: View {
                 withAnimation(LoopAnimation.meshBreath) {
                     heroPulse = true
                 }
+                withAnimation(.easeInOut(duration: 7.0).repeatForever(autoreverses: true)) {
+                    blob1 = true
+                }
+                withAnimation(.easeInOut(duration: 9.5).repeatForever(autoreverses: true).delay(1.2)) {
+                    blob2 = true
+                }
+                withAnimation(.easeInOut(duration: 6.0).repeatForever(autoreverses: true).delay(2.8)) {
+                    blob3 = true
+                }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 benefitsReveal = true
@@ -64,22 +76,22 @@ struct AuthView: View {
     private var decorativeBlobs: some View {
         ZStack {
             Circle()
-                .fill(Color.coral.opacity(0.22))
-                .frame(width: 280, height: 280)
-                .blur(radius: 70)
-                .offset(x: -140, y: -260)
+                .fill(Color.coral.opacity(0.18))
+                .frame(width: blob1 ? 320 : 260, height: blob1 ? 320 : 260)
+                .blur(radius: 75)
+                .offset(x: blob1 ? -110 : -160, y: blob1 ? -220 : -280)
 
             Circle()
-                .fill(Color.cerulean.opacity(0.28))
-                .frame(width: 320, height: 320)
-                .blur(radius: 90)
-                .offset(x: 160, y: 200)
+                .fill(Color.amethyst.opacity(0.20))
+                .frame(width: blob2 ? 360 : 290, height: blob2 ? 360 : 290)
+                .blur(radius: 95)
+                .offset(x: blob2 ? 130 : 180, y: blob2 ? 240 : 180)
 
             Circle()
-                .fill(Color.periwinkle.opacity(0.18))
-                .frame(width: 220, height: 220)
-                .blur(radius: 80)
-                .offset(x: 180, y: -180)
+                .fill(Color.coral.opacity(0.10))
+                .frame(width: blob3 ? 240 : 200, height: blob3 ? 240 : 200)
+                .blur(radius: 85)
+                .offset(x: blob3 ? 150 : 200, y: blob3 ? -200 : -150)
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
