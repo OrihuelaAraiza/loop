@@ -1,35 +1,63 @@
-import Lottie
 import SwiftUI
 
 struct CelebrationView: View {
     @StateObject private var viewModel = CelebrationViewModel()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var displayXP: Int = 0
     let onNext: () -> Void
 
     var body: some View {
         ZStack {
-            AmbientBackground(topColor: .coral, bottomColor: .amethyst)
-            ConfettiLottieView()
+            LoopMeshBackground()
+
+            ConfettiLayer()
                 .allowsHitTesting(false)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             ScrollView {
                 VStack(spacing: Spacing.lg) {
-                    LoopyView(mood: .celebrating)
+                    celebratingLoopy
+
                     Text("Leccion completada")
                         .font(LoopFont.black(28))
                         .foregroundColor(.textPrimary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    ChipView(icon: "star.fill", text: "+\(viewModel.xpGained) XP", tint: .amethyst)
+                    ChipView(icon: "star.fill", text: "+\(displayXP) XP", tint: .amethyst)
+                        .contentTransition(.numericText())
+                        .animation(LoopAnimation.springMedium, value: displayXP)
 
                     badgeGrid
                     streakBar
 
-                    LoopCTA(title: "Siguiente leccion", action: onNext)
+                    LoopCTA(title: "Siguiente leccion") {
+                        HapticManager.shared.impact(.medium)
+                        onNext()
+                    }
                 }
                 .padding(.horizontal, Spacing.lg)
                 .padding(.bottom, 90)
+            }
+        }
+        .onAppear {
+            HapticManager.shared.success()
+            withAnimation(.easeOut(duration: 0.9)) {
+                displayXP = viewModel.xpGained
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var celebratingLoopy: some View {
+        if reduceMotion {
+            LoopyView(mood: .celebrating)
+        } else {
+            PhaseAnimator([0.92, 1.08, 1.0]) { phase in
+                LoopyView(mood: .celebrating)
+                    .scaleEffect(phase)
+            } animation: { _ in
+                .spring(response: 0.6, dampingFraction: 0.55)
             }
         }
     }
@@ -70,14 +98,3 @@ struct CelebrationView: View {
     }
 }
 
-private struct ConfettiLottieView: UIViewRepresentable {
-    func makeUIView(context: Context) -> LottieAnimationView {
-        let animationView = LottieAnimationView(name: "confetti")
-        animationView.loopMode = .playOnce
-        animationView.play()
-        animationView.contentMode = .scaleAspectFit
-        return animationView
-    }
-
-    func updateUIView(_ uiView: LottieAnimationView, context: Context) {}
-}

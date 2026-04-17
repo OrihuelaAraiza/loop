@@ -27,10 +27,15 @@ struct MainTabView: View {
             BottomNavBar(selected: $selected)
         }
         .fullScreenCover(isPresented: $showExercise) {
-            ExerciseView {
-                showExercise = false
-                showCelebration = true
-            }
+            ExerciseView(
+                onCompleted: {
+                    showExercise = false
+                    showCelebration = true
+                },
+                onClose: {
+                    showExercise = false
+                }
+            )
         }
         .fullScreenCover(isPresented: $showCelebration) {
             CelebrationView {

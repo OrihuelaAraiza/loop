@@ -18,17 +18,19 @@ struct HomeView: View {
 
     var body: some View {
         ZStack {
-            AmbientBackground(topColor: .amethyst, bottomColor: .cerulean)
+            LoopMeshBackground()
             ScrollView {
                 VStack(spacing: Spacing.lg) {
                     topBar
                         .padding(.top, Spacing.sm)
-                    loopyCard
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    lessonCTA
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    dashboardSection
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    if revealCards {
+                        loopyCard
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        lessonCTA
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        dashboardSection
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
                 .padding(.horizontal, Spacing.lg)
                 .padding(.bottom, 130)
@@ -89,7 +91,10 @@ struct HomeView: View {
     }
 
     private var lessonCTA: some View {
-        Button(action: onStartLesson) {
+        Button {
+            HapticManager.shared.impact(.medium)
+            onStartLesson()
+        } label: {
             LoopCard(accentColor: .coral, showsSceneAccent: true, usesGlassSurface: true) {
                 HStack(alignment: .center, spacing: Spacing.md) {
                     ZStack {
@@ -128,61 +133,61 @@ struct HomeView: View {
 
     private var streakTracker: some View {
         LoopCard(accentColor: .loopGold.opacity(0.6), usesGlassSurface: true) {
-            VStack(alignment: .leading, spacing: Spacing.sm) {
-                HStack {
-                    Text("RACHA SEMANAL")
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                HStack(alignment: .center) {
+                    Text("Racha semanal")
                         .font(LoopFont.bold(14))
                         .foregroundColor(.textSecond)
+                        .textCase(.uppercase)
+                        .tracking(0.8)
                     Spacer()
                     HStack(spacing: 6) {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.loopGold)
                         Text("\(appState.gameState.currentStreak) dias")
-                            .font(LoopFont.bold(18))
+                            .font(LoopFont.bold(16))
                             .foregroundColor(.loopGold)
                     }
                 }
-                HStack {
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: Spacing.xs) {
                     ForEach(Array(dayLabels.enumerated()), id: \.offset) { idx, label in
-                        Spacer(minLength: 0)
                         DayNode(label: label, state: viewModel.weeklyStates[idx])
-                        Spacer(minLength: 0)
+                            .frame(maxWidth: .infinity)
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var dailyGoal: some View {
-        LoopCard(accentColor: .cerulean, showsSceneAccent: true, usesGlassSurface: true) {
+        LoopCard(accentColor: .cerulean, usesGlassSurface: true) {
             VStack(alignment: .leading, spacing: Spacing.sm) {
-                ViewThatFits(in: .vertical) {
-                    HStack {
-                        Text("Meta de hoy")
-                            .font(LoopFont.bold(16))
-                            .foregroundColor(.textPrimary)
-                        Spacer()
-                        Text("\(appState.gameState.dailyXP) / \(appState.gameState.dailyGoal) XP")
-                            .font(LoopFont.bold(14))
-                            .foregroundColor(.mint)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Meta de hoy")
-                            .font(LoopFont.bold(16))
-                            .foregroundColor(.textPrimary)
-                        Text("\(appState.gameState.dailyXP) / \(appState.gameState.dailyGoal) XP")
-                            .font(LoopFont.bold(14))
-                            .foregroundColor(.mint)
-                    }
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Meta de hoy")
+                        .font(LoopFont.bold(16))
+                        .foregroundColor(.textPrimary)
+                    Spacer()
+                    Text("\(appState.gameState.dailyXP) / \(appState.gameState.dailyGoal) XP")
+                        .font(LoopFont.bold(14))
+                        .foregroundColor(.mint)
+                        .contentTransition(.numericText())
+                        .animation(LoopAnimation.springMedium, value: appState.gameState.dailyXP)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 LoopProgressBar(progress: Double(appState.gameState.dailyXP) / Double(appState.gameState.dailyGoal), height: 12)
+
                 Text("Con una sesion mas completas el objetivo del dia.")
                     .font(LoopFont.regular(12))
                     .foregroundColor(.textSecond)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

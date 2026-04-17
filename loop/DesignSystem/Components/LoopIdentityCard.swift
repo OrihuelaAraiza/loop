@@ -31,8 +31,9 @@ struct LoopIdentityCard: View {
 
     @StateObject private var motion = LoopTiltMotionManager()
     @State private var isFlipped = false
-    @State private var accumulatedOffset: CGSize = .zero
-    @GestureState private var dragTranslation: CGSize = .zero
+    @State private var dragPitch: Double = 0
+    @State private var dragRoll: Double = 0
+    @State private var isDragging = false
 
     private let avatars = ["person.circle.fill", "laptopcomputer", "terminal.fill", "cpu.fill", "gamecontroller.fill"]
 
@@ -48,13 +49,14 @@ struct LoopIdentityCard: View {
         }
         .frame(maxWidth: .infinity)
         .frame(minHeight: 248)
-        .offset(liveOffset)
-        .rotation3DEffect(.degrees(-motion.pitch * tiltMultiplier * 6), axis: (x: 1, y: 0, z: 0), perspective: 0.45)
-        .rotation3DEffect(.degrees(motion.roll * tiltMultiplier * 8), axis: (x: 0, y: 1, z: 0), perspective: 0.45)
+        .rotation3DEffect(.degrees(-combinedPitch * 12), axis: (x: 1, y: 0, z: 0), perspective: 0.45)
+        .rotation3DEffect(.degrees(combinedRoll * 14), axis: (x: 0, y: 1, z: 0), perspective: 0.45)
+        .scaleEffect(isDragging ? 1.015 : 1)
         .shadow(color: accent.opacity(0.12 + (0.3 * userProfile.cardGlowStrength)), radius: 14 + (14 * userProfile.cardGlowStrength), y: 8 + (6 * userProfile.cardGlowStrength))
         .shadow(color: .black.opacity(0.12), radius: 18, y: 10)
         .contentShape(RoundedRectangle(cornerRadius: Radius.xl))
         .onTapGesture {
+            HapticManager.shared.impact(.medium)
             withAnimation(.spring(response: 0.52, dampingFraction: 0.84)) {
                 isFlipped.toggle()
             }
@@ -74,9 +76,7 @@ struct LoopIdentityCard: View {
         }
         .onChange(of: userProfile.cardDragEnabled) { _, isEnabled in
             if !isEnabled {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
-                    accumulatedOffset = .zero
-                }
+                resetDragTilt(animated: true)
             }
         }
         .onDisappear { motion.stop() }
@@ -403,43 +403,55 @@ struct LoopIdentityCard: View {
         return trimmed.isEmpty ? "Loop Learner" : trimmed
     }
 
-    private var tiltMultiplier: Double {
-        userProfile.cardMotionEnabled ? 1 : 0
+    private var motionPitch: Double {
+        userProfile.cardMotionEnabled ? motion.pitch : 0
     }
 
-    private var liveOffset: CGSize {
-        guard userProfile.cardDragEnabled else { return .zero }
-        return clampOffset(CGSize(width: accumulatedOffset.width + dragTranslation.width, height: accumulatedOffset.height + dragTranslation.height))
+    private var motionRoll: Double {
+        userProfile.cardMotionEnabled ? motion.roll : 0
+    }
+
+    private var combinedPitch: Double {
+        motionPitch + dragPitch
+    }
+
+    private var combinedRoll: Double {
+        motionRoll + dragRoll
     }
 
     private var cardDragGesture: some Gesture {
         DragGesture(minimumDistance: 3, coordinateSpace: .local)
-            .updating($dragTranslation) { value, state, _ in
+            .onChanged { value in
                 guard userProfile.cardDragEnabled else { return }
-                state = value.translation
+                if !isDragging {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                        isDragging = true
+                    }
+                }
+                let maxDrag: CGFloat = 120
+                let clampedX = Double(max(min(value.translation.width, maxDrag), -maxDrag) / maxDrag)
+                let clampedY = Double(max(min(value.translation.height, maxDrag), -maxDrag) / maxDrag)
+                dragRoll = clampedX * 0.45
+                dragPitch = clampedY * 0.45
             }
-            .onEnded { value in
-                guard userProfile.cardDragEnabled else {
-                    accumulatedOffset = .zero
-                    return
-                }
-                withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) {
-                    accumulatedOffset = clampOffset(
-                        CGSize(
-                            width: accumulatedOffset.width + value.translation.width,
-                            height: accumulatedOffset.height + value.translation.height
-                        )
-                    )
-                }
+            .onEnded { _ in
+                resetDragTilt(animated: true)
             }
     }
 
-    private func clampOffset(_ value: CGSize) -> CGSize {
-        let maxOffset: CGFloat = 34
-        return CGSize(
-            width: min(max(value.width, -maxOffset), maxOffset),
-            height: min(max(value.height, -maxOffset), maxOffset)
-        )
+    private func resetDragTilt(animated: Bool) {
+        let reset = {
+            dragPitch = 0
+            dragRoll = 0
+            isDragging = false
+        }
+        if animated {
+            withAnimation(.interpolatingSpring(stiffness: 140, damping: 12)) {
+                reset()
+            }
+        } else {
+            reset()
+        }
     }
 
     private var avatarSymbol: String {
@@ -487,7 +499,7 @@ struct LoopIdentityCard: View {
 
     private var cardInteractionHint: String {
         if userProfile.cardDragEnabled {
-            return "Toca para girarla y arrastrala con el dedo para moverla."
+            return "Toca para girarla. Arrastra con el dedo y vera la inclinacion reaccionar."
         }
         return "Toca la tarjeta para ver tu snapshot actual."
     }

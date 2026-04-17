@@ -1,3 +1,4 @@
+import Pow
 import SwiftUI
 import UIKit
 
@@ -8,14 +9,13 @@ struct OnboardingFlow: View {
 
     var body: some View {
         ZStack {
-            AmbientBackground(topColor: .amethyst, bottomColor: .cerulean)
-                .ignoresSafeArea()
+            LoopMeshBackground()
 
             VStack(spacing: 0) {
                 header
                 stepContent
                     .id(viewModel.step)
-                    .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .trailing)), removal: .opacity))
+                    .transition(AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity))
             }
             .animation(.spring(response: 0.45, dampingFraction: 0.88), value: viewModel.step)
         }
@@ -122,7 +122,7 @@ private struct CrumbStepsBar: View {
                             )
                     )
                     .frame(width: index == currentStep ? 30 : 12, height: 8)
-                    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: currentStep)
+                    .animation(LoopAnimation.springBouncy, value: currentStep)
             }
         }
         .padding(.horizontal, 2)
@@ -254,6 +254,14 @@ private struct OnboardingSelectableCard<Content: View>: View {
 
 private struct OnboardingWelcomeView: View {
     let next: () -> Void
+    @State private var showBubble = false
+    @State private var showFeatures = false
+
+    private let features: [(icon: String, tint: Color, title: String, detail: String)] = [
+        ("map.fill", .cerulean, "Rutas claras", "Progreso visual por modulos."),
+        ("bolt.fill", .loopGold, "Sesiones cortas", "Lecciones de alto impacto."),
+        ("checkmark.circle.fill", .amethyst, "Feedback inmediato", "Correccion al instante.")
+    ]
 
     var body: some View {
         OnboardingContainer(
@@ -261,19 +269,7 @@ private struct OnboardingWelcomeView: View {
             subtitle: "Aprende programacion con retos diarios y un plan adaptado a tu ritmo.",
             eyebrow: "Inicio"
         ) {
-            ViewThatFits(in: .vertical) {
-                HStack(alignment: .top, spacing: Spacing.md) {
-                    LoopyView(mood: .speaking)
-                        .frame(width: 100, height: 110)
-                    LoopyBubbleView(text: "Te guiare paso a paso para construir constancia real y progreso medible.")
-                }
-
-                VStack(alignment: .leading, spacing: Spacing.md) {
-                    LoopyView(mood: .speaking)
-                        .frame(width: 100, height: 110)
-                    LoopyBubbleView(text: "Te guiare paso a paso para construir constancia real y progreso medible.")
-                }
-            }
+            loopyCard
 
             ViewThatFits(in: .vertical) {
                 HStack(spacing: Spacing.sm) {
@@ -288,20 +284,80 @@ private struct OnboardingWelcomeView: View {
             }
 
             LoopCard(accentColor: .coral, showsSceneAccent: true) {
-                featureRow(icon: "star.fill", title: "Rutas claras", detail: "Progreso visual por modulos.")
-                featureRow(icon: "bolt.fill", title: "Sesiones cortas", detail: "Lecciones de alto impacto.")
-                featureRow(icon: "checkmark.circle.fill", title: "Feedback inmediato", detail: "Correccion al instante.")
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    ForEach(Array(features.enumerated()), id: \.offset) { index, feature in
+                        Group {
+                            if showFeatures {
+                                featureRow(icon: feature.icon, tint: feature.tint, title: feature.title, detail: feature.detail)
+                                    .transition(AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity))
+                            }
+                        }
+                        .animation(.default.delay(0.1 * Double(index)), value: showFeatures)
+                    }
+                }
             }
 
-            LoopCTA(title: "Continuar", trailingIcon: "arrow.right", style: .solid(.coral), action: next)
+            LoopCTA(title: "Continuar", trailingIcon: "arrow.right", style: .solid(.coral)) {
+                HapticManager.shared.impact(.medium)
+                next()
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                withAnimation(LoopAnimation.springMedium) {
+                    showBubble = true
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+                showFeatures = true
+            }
         }
     }
 
-    private func featureRow(icon: String, title: String, detail: String) -> some View {
+    @ViewBuilder
+    private var loopyCard: some View {
+        let content = ViewThatFits(in: .vertical) {
+            HStack(alignment: .center, spacing: Spacing.md) {
+                LoopyView(mood: .speaking)
+                    .scaleEffect(0.68)
+                    .frame(width: 120, height: 130)
+                if showBubble {
+                    LoopyBubbleView(text: "Te guiare paso a paso para construir constancia real y progreso medible.")
+                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                } else {
+                    LoopyTypingDots()
+                }
+            }
+
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                LoopyView(mood: .speaking)
+                    .scaleEffect(0.68)
+                    .frame(width: 120, height: 130)
+                if showBubble {
+                    LoopyBubbleView(text: "Te guiare paso a paso para construir constancia real y progreso medible.")
+                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                } else {
+                    LoopyTypingDots()
+                }
+            }
+        }
+
+        LoopCard(accentColor: .clear) {
+            content
+                .padding(.vertical, 4)
+        }
+    }
+
+    private func featureRow(icon: String, tint: Color, title: String, detail: String) -> some View {
         HStack(spacing: Spacing.md) {
-            Image(systemName: icon)
-                .foregroundColor(.periwinkle)
-                .frame(width: 20)
+            ZStack {
+                Circle()
+                    .fill(tint.opacity(0.18))
+                    .frame(width: 34, height: 34)
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(tint)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(LoopFont.bold(14)).foregroundColor(.textPrimary)
                 Text(detail).font(LoopFont.regular(13)).foregroundColor(.textSecond)
@@ -388,37 +444,7 @@ private struct OnboardingNameView: View {
 
                     LazyVGrid(columns: columns, spacing: Spacing.sm) {
                         ForEach(0 ..< avatars.count, id: \.self) { index in
-                            Button {
-                                viewModel.userProfile.avatarIndex = index
-                            } label: {
-                                ZStack {
-                                    Circle()
-                                        .fill(index == viewModel.userProfile.avatarIndex ? Color.coral.opacity(0.18) : Color.loopSurf2)
-                                    Image(systemName: avatars[index])
-                                        .font(.system(size: 19, weight: .bold))
-                                        .foregroundColor(index == viewModel.userProfile.avatarIndex ? .white : .periwinkle)
-                                }
-                                .frame(height: 56)
-                                .background(
-                                    Circle()
-                                        .fill(
-                                            index == viewModel.userProfile.avatarIndex
-                                                ? LinearGradient(
-                                                    colors: [Color.coral, Color.amethyst.opacity(0.9)],
-                                                    startPoint: .topLeading,
-                                                    endPoint: .bottomTrailing
-                                                )
-                                                : LinearGradient(
-                                                    colors: [Color.loopSurf2, Color.loopSurf2],
-                                                    startPoint: .topLeading,
-                                                    endPoint: .bottomTrailing
-                                                )
-                                        )
-                                )
-                                .overlay(Circle().stroke(index == viewModel.userProfile.avatarIndex ? Color.white.opacity(0.24) : Color.borderSoft, lineWidth: 1.4))
-                                .scaleEffect(index == viewModel.userProfile.avatarIndex ? 1 : 0.96)
-                            }
-                            .buttonStyle(.plain)
+                            avatarButton(index: index)
                         }
                     }
                 }
@@ -444,7 +470,13 @@ private struct OnboardingNameView: View {
                 Image(systemName: avatars[viewModel.userProfile.avatarIndex])
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(.white)
+                    .id(viewModel.userProfile.avatarIndex)
+                    .transition(.scale(scale: 0.5).combined(with: .opacity))
             )
+            .overlay(
+                Circle().stroke(Color.coral.opacity(0.45), lineWidth: 1.5)
+            )
+            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: viewModel.userProfile.avatarIndex)
     }
 
     private var profileTitle: some View {
@@ -453,6 +485,53 @@ private struct OnboardingNameView: View {
             .foregroundColor(.textPrimary)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
+            .contentTransition(.interpolate)
+            .id(trimmedName.isEmpty ? "placeholder" : trimmedName)
+    }
+
+    private func avatarButton(index: Int) -> some View {
+        let isSelected = index == viewModel.userProfile.avatarIndex
+        return Button {
+            HapticManager.shared.selection()
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.62)) {
+                viewModel.userProfile.avatarIndex = index
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .strokeBorder(Color.coral, lineWidth: 2)
+                    .frame(width: 62, height: 62)
+                    .shadow(color: .coral.opacity(0.55), radius: 10)
+                    .opacity(isSelected ? 1 : 0)
+
+                Circle()
+                    .fill(
+                        isSelected
+                            ? AnyShapeStyle(
+                                LinearGradient(
+                                    colors: [Color.coral, Color.amethyst.opacity(0.9)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            : AnyShapeStyle(Color.loopSurf2)
+                    )
+                    .frame(width: 52, height: 52)
+
+                Image(systemName: avatars[index])
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(isSelected ? .white : .periwinkle)
+            }
+            .frame(width: 66, height: 66)
+            .scaleEffect(isSelected ? 1.06 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        }
+        .buttonStyle(.plain)
+        .changeEffect(.spray(origin: UnitPoint.center) {
+            Image(systemName: "sparkle").foregroundColor(.coral)
+        }, value: isSelected, isEnabled: isSelected)
+        .accessibilityLabel(Text("Avatar \(index + 1)"))
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
     }
 }
 
@@ -477,7 +556,6 @@ private struct OnboardingAgeView: View {
 
 private struct AgeDialPicker: View {
     @Binding var age: Int
-    @State private var sliderValue: Double = 17
     @State private var lastHapticAge: Int = -1
 
     private let minAge = 4
@@ -545,7 +623,7 @@ private struct AgeDialPicker: View {
                         .blur(radius: 2)
 
                     Circle()
-                        .stroke(Color.periwinkle.opacity(0.1), lineWidth: ringLineWidth)
+                        .stroke(Color.trackInactive, lineWidth: ringLineWidth)
                         .frame(width: ringSize, height: ringSize)
 
                     tickMarks
@@ -554,7 +632,7 @@ private struct AgeDialPicker: View {
                         .trim(from: 0, to: ringProgress)
                         .stroke(
                             AngularGradient(
-                                gradient: Gradient(colors: [ageDescriptor.tint.opacity(0.12), ageDescriptor.tint, Color.periwinkle]),
+                                gradient: Gradient(colors: [Color.coral, Color.amethyst]),
                                 center: .center
                             ),
                             style: StrokeStyle(lineWidth: ringLineWidth, lineCap: .round)
@@ -563,9 +641,10 @@ private struct AgeDialPicker: View {
                         .frame(width: ringSize, height: ringSize)
 
                     Circle()
-                        .fill(Color.periwinkle)
-                        .frame(width: 18, height: 18)
-                        .shadow(color: ageDescriptor.tint.opacity(0.4), radius: 10)
+                        .fill(Color.coral)
+                        .frame(width: 20, height: 20)
+                        .shadow(color: Color.coral.opacity(0.55), radius: 10)
+                        .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 1))
                         .offset(ringHandleOffset)
 
                     Circle()
@@ -590,9 +669,17 @@ private struct AgeDialPicker: View {
                                 Text("\(age)")
                                     .font(LoopFont.black(48))
                                     .foregroundColor(Color.loopBG)
-                                Text(AgeRange.from(age: age).rawValue)
-                                    .font(LoopFont.bold(13))
-                                    .foregroundColor(Color.loopBG.opacity(0.72))
+                                    .contentTransition(.numericText())
+                                    .animation(LoopAnimation.springFast, value: age)
+                                ZStack {
+                                    ForEach([ageDescriptor.title], id: \.self) { title in
+                                        Text(title)
+                                            .font(LoopFont.bold(13))
+                                            .foregroundColor(Color.loopBG.opacity(0.72))
+                                            .transition(.asymmetric(insertion: .movingParts.pop, removal: .movingParts.poof))
+                                    }
+                                }
+                                .animation(LoopAnimation.springBouncy, value: ageDescriptor.title)
                             }
                         )
                 }
@@ -618,7 +705,7 @@ private struct AgeDialPicker: View {
 
                         Spacer()
 
-                        Text("\(age) anos")
+                        Text("\(age) años")
                             .font(LoopFont.bold(14))
                             .foregroundColor(.textPrimary)
                     }
@@ -635,47 +722,26 @@ private struct AgeDialPicker: View {
                         selectAge(age - 1, triggerHeavy: true)
                     }
 
-                    Slider(
-                        value: $sliderValue,
-                        in: Double(minAge) ... Double(maxAge),
-                        step: 1
-                    )
-                    .tint(ageDescriptor.tint)
-                    .onChange(of: sliderValue) { _, _ in
-                        let newAge = Int(sliderValue.rounded())
-                        age = min(max(newAge, minAge), maxAge)
-                        if age != lastHapticAge {
-                            triggerHaptic(.light)
-                            lastHapticAge = age
-                        }
-                    }
+                    Spacer()
+
+                    Text("Arrastra el aro")
+                        .font(LoopFont.regular(12))
+                        .foregroundColor(.textMuted)
+
+                    Spacer()
 
                     AgeAdjustButton(icon: "plus", tint: ageDescriptor.tint, isDisabled: age == maxAge) {
                         selectAge(age + 1, triggerHeavy: true)
                     }
                 }
-
-                HStack {
-                    Text("\(minAge)").font(LoopFont.bold(16)).foregroundColor(.textSecond)
-                    Spacer()
-                    Text("Arrastra el aro o usa +/-")
-                        .font(LoopFont.regular(12))
-                        .foregroundColor(.textMuted)
-                    Spacer()
-                    Text("\(maxAge)").font(LoopFont.bold(16)).foregroundColor(.textSecond)
-                }
             }
         }
         .onAppear {
             age = min(max(age, minAge), maxAge)
-            sliderValue = Double(age)
             lastHapticAge = age
         }
         .onChange(of: age) { _, newAge in
             let clamped = min(max(newAge, minAge), maxAge)
-            if Int(sliderValue.rounded()) != clamped {
-                sliderValue = Double(clamped)
-            }
             if clamped != lastHapticAge {
                 lastHapticAge = clamped
             }
@@ -698,12 +764,11 @@ private struct AgeDialPicker: View {
     private func selectAge(_ value: Int, triggerHeavy: Bool) {
         let clamped = min(max(value, minAge), maxAge)
         if clamped == age { return }
-        age = clamped
         withAnimation(.spring(response: 0.24, dampingFraction: 0.84)) {
-            sliderValue = Double(clamped)
+            age = clamped
         }
         if triggerHeavy {
-            triggerHaptic(.medium)
+            HapticManager.shared.impact(.medium)
             lastHapticAge = clamped
         }
     }
@@ -727,17 +792,11 @@ private struct AgeDialPicker: View {
         let clamped = min(max(newAge, minAge), maxAge)
         if clamped != age {
             age = clamped
-            sliderValue = Double(clamped)
             if clamped != lastHapticAge {
-                triggerHaptic(.light)
+                HapticManager.shared.impact(.light)
                 lastHapticAge = clamped
             }
         }
-    }
-
-    private func triggerHaptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        let generator = UIImpactFeedbackGenerator(style: style)
-        generator.impactOccurred()
     }
 }
 
@@ -788,18 +847,22 @@ private struct OnboardingGoalView: View {
     }
 
     private func goalCard(_ goal: LearningGoal, icon: String, detail: String) -> some View {
-        Button {
-            viewModel.userProfile.goal = goal
+        let isSelected = viewModel.userProfile.goal == goal
+        return Button {
+            HapticManager.shared.selection()
+            withAnimation(LoopAnimation.springFast) {
+                viewModel.userProfile.goal = goal
+            }
         } label: {
-            OnboardingSelectableCard(isSelected: viewModel.userProfile.goal == goal, tint: .coral) {
+            OnboardingSelectableCard(isSelected: isSelected, tint: .coral) {
                 HStack(spacing: Spacing.md) {
                     Circle()
-                        .fill(viewModel.userProfile.goal == goal ? Color.coral.opacity(0.22) : Color.loopSurf3)
+                        .fill(isSelected ? Color.coral.opacity(0.22) : Color.loopSurf3)
                         .frame(width: 42, height: 42)
                         .overlay(
                             Image(systemName: icon)
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(viewModel.userProfile.goal == goal ? .white : .periwinkle)
+                                .foregroundColor(isSelected ? .white : .periwinkle)
                         )
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -808,12 +871,26 @@ private struct OnboardingGoalView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer()
-                    Image(systemName: viewModel.userProfile.goal == goal ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(viewModel.userProfile.goal == goal ? .mint : .textMuted)
+                    ZStack {
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.coral)
+                                .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .movingParts.poof))
+                        } else {
+                            Image(systemName: "circle")
+                                .font(.system(size: 20))
+                                .foregroundColor(.textMuted)
+                        }
+                    }
+                    .animation(LoopAnimation.springBouncy, value: isSelected)
                 }
             }
         }
         .buttonStyle(.plain)
+        .changeEffect(.spray(origin: UnitPoint.center) {
+            Image(systemName: "sparkle").foregroundColor(.coral)
+        }, value: isSelected, isEnabled: isSelected)
     }
 }
 
@@ -824,70 +901,129 @@ private struct OnboardingLevelView: View {
         OnboardingContainer(title: "Nivel actual", subtitle: "Selecciona tu punto de partida real.", eyebrow: "Nivel") {
             VStack(spacing: Spacing.sm) {
                 ForEach(Level.allCases) { level in
-                    Button {
-                        viewModel.userProfile.knowledgeLevel = level
-                    } label: {
-                        OnboardingSelectableCard(
-                            isSelected: viewModel.userProfile.knowledgeLevel == level,
-                            tint: .amethyst,
-                            isDisabled: viewModel.wantsPlacementTest
-                        ) {
-                            HStack(spacing: Spacing.md) {
-                                Circle()
-                                    .fill(viewModel.userProfile.knowledgeLevel == level ? Color.amethyst.opacity(0.2) : Color.loopSurf3)
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Image(systemName: icon(for: level))
-                                            .font(.system(size: 15, weight: .bold))
-                                            .foregroundColor(viewModel.userProfile.knowledgeLevel == level ? .white : .periwinkle)
-                                    )
-
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(level.rawValue)
-                                        .font(LoopFont.semiBold(14))
-                                        .foregroundColor(.textPrimary)
-                                    Text(detail(for: level))
-                                        .font(LoopFont.regular(13))
-                                        .foregroundColor(.textSecond)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-
-                                Spacer()
-
-                                if viewModel.wantsPlacementTest {
-                                    Image(systemName: "lock.fill")
-                                        .foregroundColor(.textMuted)
-                                } else if viewModel.userProfile.knowledgeLevel == level {
-                                    Image(systemName: "checkmark.circle.fill").foregroundColor(.mint)
-                                }
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(viewModel.wantsPlacementTest)
+                    levelRow(level: level)
                 }
             }
 
             if viewModel.wantsPlacementTest {
                 OnboardingMiniPill(icon: "lock.fill", text: "El mini test definira tu nivel", tint: .loopGold)
+                    .transition(AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity))
             }
 
-            LoopCard(accentColor: viewModel.wantsPlacementTest ? .loopGold : .clear, showsSceneAccent: viewModel.wantsPlacementTest) {
-                Toggle(isOn: $viewModel.wantsPlacementTest) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Hacer mini test de placement")
+            placementTestCard
+
+            if viewModel.wantsPlacementTest {
+                placementExplainer
+                    .transition(AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            LoopCTA(title: "Continuar", trailingIcon: "arrow.right", style: .solid(.coral)) {
+                HapticManager.shared.impact(.medium)
+                viewModel.next()
+            }
+        }
+    }
+
+    private func levelRow(level: Level) -> some View {
+        let isSelected = viewModel.userProfile.knowledgeLevel == level
+        return Button {
+            HapticManager.shared.selection()
+            withAnimation(LoopAnimation.springFast) {
+                viewModel.userProfile.knowledgeLevel = level
+            }
+        } label: {
+            OnboardingSelectableCard(
+                isSelected: isSelected,
+                tint: .amethyst,
+                isDisabled: viewModel.wantsPlacementTest
+            ) {
+                HStack(spacing: Spacing.md) {
+                    Circle()
+                        .fill(isSelected ? Color.amethyst.opacity(0.2) : Color.loopSurf3)
+                        .frame(width: 40, height: 40)
+                        .overlay(
+                            Image(systemName: icon(for: level))
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(isSelected ? .white : .periwinkle)
+                        )
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(level.rawValue)
                             .font(LoopFont.semiBold(14))
                             .foregroundColor(.textPrimary)
-                        Text("Si activas esto, arrancamos con 3 preguntas para ajustar mejor tu modulo inicial.")
+                        Text(detail(for: level))
                             .font(LoopFont.regular(13))
                             .foregroundColor(.textSecond)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                }
-                .tint(.coral)
-            }
 
-            LoopCTA(title: "Continuar", trailingIcon: "arrow.right", style: .solid(.coral)) { viewModel.next() }
+                    Spacer()
+
+                    ZStack {
+                        if viewModel.wantsPlacementTest {
+                            Image(systemName: "lock.fill")
+                                .foregroundColor(.textMuted)
+                        } else if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.coral)
+                                .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .movingParts.poof))
+                        }
+                    }
+                    .animation(LoopAnimation.springBouncy, value: isSelected)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(viewModel.wantsPlacementTest)
+        .changeEffect(.spray(origin: UnitPoint.center) {
+            Image(systemName: "sparkle").foregroundColor(.amethyst)
+        }, value: isSelected, isEnabled: isSelected && !viewModel.wantsPlacementTest)
+    }
+
+    private var placementTestCard: some View {
+        LoopCard(accentColor: viewModel.wantsPlacementTest ? .loopGold : .clear, showsSceneAccent: viewModel.wantsPlacementTest) {
+            HStack(spacing: Spacing.md) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Hacer mini test de placement")
+                        .font(LoopFont.semiBold(14))
+                        .foregroundColor(.textPrimary)
+                    Text("Si activas esto, arrancamos con 3 preguntas para ajustar mejor tu modulo inicial.")
+                        .font(LoopFont.regular(13))
+                        .foregroundColor(.textSecond)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: Spacing.sm)
+                LoopPlacementToggle(isOn: $viewModel.wantsPlacementTest)
+            }
+        }
+    }
+
+    private var placementExplainer: some View {
+        LoopCard(accentColor: .loopGold) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Te haremos 3 preguntas")
+                    .font(LoopFont.bold(14))
+                    .foregroundColor(.textPrimary)
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "1.circle.fill").foregroundColor(.loopGold)
+                    Text("Una de sintaxis basica para calibrar confianza.")
+                        .font(LoopFont.regular(12))
+                        .foregroundColor(.textSecond)
+                }
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "2.circle.fill").foregroundColor(.loopGold)
+                    Text("Una de logica para ver como piensas el flujo.")
+                        .font(LoopFont.regular(12))
+                        .foregroundColor(.textSecond)
+                }
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "3.circle.fill").foregroundColor(.loopGold)
+                    Text("Una de lectura de codigo para detectar nivel real.")
+                        .font(LoopFont.regular(12))
+                        .foregroundColor(.textSecond)
+                }
+            }
         }
     }
 
@@ -922,125 +1058,120 @@ private struct OnboardingTimeView: View {
     @ObservedObject var viewModel: OnboardingViewModel
     private let minuteOptions = [5, 10, 15, 20, 30]
     private let columns = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
-    private let dayColumns = [GridItem(.adaptive(minimum: 78), spacing: Spacing.sm)]
+    @State private var showConfetti = false
+    @State private var confettiOpacity: Double = 1
 
     private var weeklyMinutes: Int {
         viewModel.userProfile.minutesPerDay * viewModel.userProfile.activeDays.count
     }
 
     var body: some View {
-        OnboardingContainer(title: "Tiempo disponible", subtitle: "Define tu ritmo semanal para mantener consistencia.", eyebrow: "Rutina") {
-            LoopCard(accentColor: .cerulean, showsSceneAccent: true) {
-                ViewThatFits(in: .vertical) {
-                    HStack {
-                        weeklySummary
-                        Spacer()
-                        activeDaysSummary
-                    }
-
-                    VStack(alignment: .leading, spacing: Spacing.sm) {
-                        weeklySummary
-                        activeDaysSummary
-                    }
-                }
-            }
-
-            VStack(alignment: .leading, spacing: Spacing.sm) {
-                Text("Minutos por dia")
-                    .font(LoopFont.semiBold(13))
-                    .foregroundColor(.textSecond)
-
-                LazyVGrid(columns: columns, spacing: Spacing.sm) {
-                    ForEach(minuteOptions, id: \.self) { option in
-                        Button {
-                            viewModel.userProfile.minutesPerDay = option
-                        } label: {
-                            OnboardingSelectableCard(isSelected: viewModel.userProfile.minutesPerDay == option, tint: .coral) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("\(option) min")
-                                        .font(LoopFont.bold(16))
-                                        .foregroundColor(.textPrimary)
-                                    Text(option <= 10 ? "Sprint express" : option <= 20 ? "Ritmo balanceado" : "Bloque profundo")
-                                        .font(LoopFont.regular(12))
-                                        .foregroundColor(.textSecond)
-                                }
-                            }
+        ZStack {
+            OnboardingContainer(title: "Tiempo disponible", subtitle: "Define tu ritmo semanal para mantener consistencia.", eyebrow: "Rutina") {
+                LoopCard(accentColor: .cerulean, showsSceneAccent: true) {
+                    ViewThatFits(in: .vertical) {
+                        HStack {
+                            weeklySummary
+                            Spacer()
+                            activeDaysSummary
                         }
-                        .buttonStyle(.plain)
+
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            weeklySummary
+                            activeDaysSummary
+                        }
                     }
                 }
-            }
 
-            VStack(alignment: .leading, spacing: Spacing.sm) {
-                Text("Dias activos")
-                    .font(LoopFont.semiBold(13))
-                    .foregroundColor(.textSecond)
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    Text("Dias activos")
+                        .font(LoopFont.semiBold(13))
+                        .foregroundColor(.textSecond)
 
-                LazyVGrid(columns: dayColumns, spacing: Spacing.sm) {
-                    ForEach(Weekday.allCases) { day in
-                        Button {
-                            if viewModel.userProfile.activeDays.contains(day) {
-                                viewModel.userProfile.activeDays.remove(day)
-                            } else {
-                                viewModel.userProfile.activeDays.insert(day)
-                            }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text(day.rawValue)
-                                        .font(LoopFont.bold(16))
-                                        .foregroundColor(viewModel.userProfile.activeDays.contains(day) ? .white : .textPrimary)
-
-                                    Spacer()
-
+                    HStack(spacing: 6) {
+                        ForEach(Weekday.allCases) { day in
+                            DayCircleChip(
+                                letter: day.rawValue,
+                                isSelected: viewModel.userProfile.activeDays.contains(day)
+                            ) {
+                                withAnimation(LoopAnimation.springFast) {
                                     if viewModel.userProfile.activeDays.contains(day) {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(.white)
+                                        viewModel.userProfile.activeDays.remove(day)
+                                    } else {
+                                        viewModel.userProfile.activeDays.insert(day)
                                     }
                                 }
-
-                                Text(dayTitle(for: day))
-                                    .font(LoopFont.regular(12))
-                                    .foregroundColor(viewModel.userProfile.activeDays.contains(day) ? Color.white.opacity(0.82) : .textSecond)
-                                    .lineLimit(2)
-                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                            .padding(.horizontal, Spacing.md)
-                            .padding(.vertical, Spacing.sm)
-                            .background(
-                                RoundedRectangle(cornerRadius: Radius.md)
-                                    .fill(
-                                        viewModel.userProfile.activeDays.contains(day)
-                                            ? LinearGradient(
-                                                colors: [Color.coral, Color.amethyst.opacity(0.9)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                            : LinearGradient(
-                                                colors: [Color.loopSurf2, Color.loopSurf1.opacity(0.96)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
-                                    )
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Radius.md)
-                                    .stroke(viewModel.userProfile.activeDays.contains(day) ? Color.white.opacity(0.16) : Color.borderSoft, lineWidth: 1)
-                            )
+                            .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.plain)
+                    }
+
+                    Text("Selecciona los dias en los que de verdad puedes sostener el ritmo.")
+                        .font(LoopFont.regular(12))
+                        .foregroundColor(.textSecond)
+                }
+
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    Text("Minutos por dia")
+                        .font(LoopFont.semiBold(13))
+                        .foregroundColor(.textSecond)
+
+                    LazyVGrid(columns: columns, spacing: Spacing.sm) {
+                        ForEach(minuteOptions, id: \.self) { option in
+                            LoopChip(
+                                title: "\(option) min",
+                                subtitle: option <= 10 ? "Sprint express" : option <= 20 ? "Ritmo balanceado" : "Bloque profundo",
+                                isSelected: viewModel.userProfile.minutesPerDay == option,
+                                fullWidth: true
+                            ) {
+                                withAnimation(LoopAnimation.springFast) {
+                                    viewModel.userProfile.minutesPerDay = option
+                                }
+                            }
+                        }
                     }
                 }
 
-                Text("Selecciona los dias en los que de verdad puedes sostener el ritmo.")
-                    .font(LoopFont.regular(12))
-                    .foregroundColor(.textSecond)
+                Button {
+                    triggerPlanGeneration()
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("Generar plan").font(LoopFont.bold(16))
+                        Image(systemName: "sparkles")
+                    }
+                }
+                .buttonStyle(LoopCTAButton())
+                .disabled(viewModel.userProfile.activeDays.isEmpty)
+                .opacity(viewModel.userProfile.activeDays.isEmpty ? 0.55 : 1)
             }
 
-            LoopCTA(title: "Generar plan", trailingIcon: "sparkles", isDisabled: viewModel.userProfile.activeDays.isEmpty, style: .solid(.coral)) {
-                viewModel.generatePlan()
-                viewModel.next()
+            if showConfetti {
+                ConfettiLayer()
+                    .opacity(confettiOpacity)
+                    .allowsHitTesting(false)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
+        }
+    }
+
+    private func triggerPlanGeneration() {
+        HapticManager.shared.impact(.medium)
+        viewModel.generatePlan()
+        withAnimation(.easeIn(duration: 0.1)) {
+            showConfetti = true
+            confettiOpacity = 1
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            withAnimation(.easeOut(duration: 0.35)) {
+                confettiOpacity = 0
+            }
+            HapticManager.shared.success()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                showConfetti = false
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.85)) {
+                    viewModel.next()
+                }
             }
         }
     }
@@ -1053,6 +1184,8 @@ private struct OnboardingTimeView: View {
             Text("\(weeklyMinutes) min por semana")
                 .font(LoopFont.bold(20))
                 .foregroundColor(.textPrimary)
+                .contentTransition(.numericText())
+                .animation(LoopAnimation.springMedium, value: weeklyMinutes)
         }
     }
 
@@ -1061,28 +1194,11 @@ private struct OnboardingTimeView: View {
             Text("\(viewModel.userProfile.activeDays.count) dias activos")
                 .font(LoopFont.bold(18))
                 .foregroundColor(.mint)
+                .contentTransition(.numericText())
+                .animation(LoopAnimation.springMedium, value: viewModel.userProfile.activeDays.count)
             Text("Tu plan se va a repartir sobre esos bloques.")
                 .font(LoopFont.regular(12))
                 .foregroundColor(.textSecond)
-        }
-    }
-
-    private func dayTitle(for day: Weekday) -> String {
-        switch day {
-        case .l:
-            return "Lunes"
-        case .m:
-            return "Martes"
-        case .x:
-            return "Miercoles"
-        case .j:
-            return "Jueves"
-        case .v:
-            return "Viernes"
-        case .s:
-            return "Sabado"
-        case .d:
-            return "Domingo"
         }
     }
 }

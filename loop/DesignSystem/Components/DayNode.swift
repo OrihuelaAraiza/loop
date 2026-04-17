@@ -7,6 +7,8 @@ struct DayNode: View {
     enum DayState { case done, today, pending }
     @State private var pulse = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         VStack(spacing: 4) {
             ZStack {
@@ -16,7 +18,7 @@ struct DayNode: View {
                     .overlay(Circle().stroke(border, lineWidth: 1.5))
                     .shadow(color: state == .today ? Color.coral.opacity(0.4) : .clear, radius: pulse ? 11 : 8)
                     .shadow(color: state == .today ? Color.coral.opacity(0.15) : .clear, radius: pulse ? 22 : 16)
-                icon
+                iconView
             }
             .scaleEffect(state == .today && pulse ? 1.06 : 1)
 
@@ -25,8 +27,8 @@ struct DayNode: View {
                 .foregroundColor(state == .today ? .coral : .textMuted)
         }
         .onAppear {
-            if state == .today {
-                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+            if state == .today, !reduceMotion {
+                withAnimation(LoopAnimation.pulseFast) {
                     pulse = true
                 }
             }
@@ -37,7 +39,7 @@ struct DayNode: View {
         switch state {
         case .done: return Color.loopGold.opacity(0.16)
         case .today: return .coral
-        case .pending: return .clear
+        case .pending: return .trackInactive
         }
     }
 
@@ -50,16 +52,27 @@ struct DayNode: View {
     }
 
     @ViewBuilder
-    private var icon: some View {
+    private var iconView: some View {
         switch state {
         case .done:
             Image(systemName: "flame.fill")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.loopGold)
         case .today:
-            Image(systemName: "flame.fill")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.white)
+            if reduceMotion {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.white)
+            } else {
+                PhaseAnimator([1.0, 1.2, 1.0]) { scale in
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white)
+                        .scaleEffect(scale)
+                } animation: { _ in
+                    .easeInOut(duration: 0.9)
+                }
+            }
         case .pending:
             EmptyView()
         }

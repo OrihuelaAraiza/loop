@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		E80822242F90617300EB48F0 /* HighlightSwift in Frameworks */ = {isa = PBXBuildFile; productRef = E80822222F90617300EB48F0 /* HighlightSwift */; };
 		E80822252F90617300EB48F0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = E80822232F90617300EB48F0 /* Lottie */; };
+		E8EB55CD2F91BBB300865574 /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = A10000012F90617300EB48F0 /* Pow */; };
+		E8EB55CE2F91BBB300865574 /* Vortex in Frameworks */ = {isa = PBXBuildFile; productRef = A10000022F90617300EB48F0 /* Vortex */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,6 +59,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E8EB55CE2F91BBB300865574 /* Vortex in Frameworks */,
+				E8EB55CD2F91BBB300865574 /* Pow in Frameworks */,
 				E80822242F90617300EB48F0 /* HighlightSwift in Frameworks */,
 				E80822252F90617300EB48F0 /* Lottie in Frameworks */,
 			);
@@ -121,6 +125,8 @@
 			packageProductDependencies = (
 				E80822222F90617300EB48F0 /* HighlightSwift */,
 				E80822232F90617300EB48F0 /* Lottie */,
+				A10000012F90617300EB48F0 /* Pow */,
+				A10000022F90617300EB48F0 /* Vortex */,
 			);
 			productName = loop;
 			productReference = E80821EE2F90617300EB48EF /* loop.app */;
@@ -207,6 +213,8 @@
 			packageReferences = (
 				E80822202F90617300EB48F0 /* XCRemoteSwiftPackageReference "HighlightSwift" */,
 				E80822212F90617300EB48F0 /* XCRemoteSwiftPackageReference "lottie-ios" */,
+				A10000032F90617300EB48F0 /* XCRemoteSwiftPackageReference "Pow" */,
+				A10000042F90617300EB48F0 /* XCRemoteSwiftPackageReference "Vortex" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E80821EF2F90617300EB48EF /* Products */;
@@ -597,6 +605,22 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A10000032F90617300EB48F0 /* XCRemoteSwiftPackageReference "Pow" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/EmergeTools/Pow";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+		A10000042F90617300EB48F0 /* XCRemoteSwiftPackageReference "Vortex" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/twostraws/Vortex";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 		E80822202F90617300EB48F0 /* XCRemoteSwiftPackageReference "HighlightSwift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/appstefan/HighlightSwift";
@@ -616,6 +640,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A10000012F90617300EB48F0 /* Pow */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000032F90617300EB48F0 /* XCRemoteSwiftPackageReference "Pow" */;
+			productName = Pow;
+		};
+		A10000022F90617300EB48F0 /* Vortex */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000042F90617300EB48F0 /* XCRemoteSwiftPackageReference "Vortex" */;
+			productName = Vortex;
+		};
 		E80822222F90617300EB48F0 /* HighlightSwift */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E80822202F90617300EB48F0 /* XCRemoteSwiftPackageReference "HighlightSwift" */;

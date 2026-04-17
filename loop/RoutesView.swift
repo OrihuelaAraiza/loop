@@ -44,7 +44,7 @@ struct RoutesView: View {
             Text("Rutas")
                 .font(LoopFont.black(28))
                 .foregroundColor(.textPrimary)
-            Text("Elige dónde continuar. Cada ruta guarda tu avance por módulo.")
+            Text("Elige donde continuar. Cada ruta guarda tu avance por modulo.")
                 .font(LoopFont.regular(13))
                 .foregroundColor(.textSecond)
                 .fixedSize(horizontal: false, vertical: true)

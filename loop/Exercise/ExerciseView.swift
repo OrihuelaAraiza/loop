@@ -2,8 +2,10 @@ import HighlightSwift
 import SwiftUI
 
 struct ExerciseView: View {
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = ExerciseViewModel()
     let onCompleted: () -> Void
+    var onClose: (() -> Void)?
 
     var body: some View {
         ZStack {
@@ -37,8 +39,24 @@ struct ExerciseView: View {
 
     private var topBar: some View {
         HStack(spacing: Spacing.md) {
-            Image(systemName: "xmark")
-                .foregroundColor(.textPrimary)
+            Button {
+                if let onClose {
+                    onClose()
+                } else {
+                    dismiss()
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.textPrimary)
+                    .frame(width: 36, height: 36)
+                    .background(Color.loopSurf2.opacity(0.9))
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.borderMid, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Cerrar leccion")
+
             LoopProgressBar(progress: viewModel.progress, height: 8)
                 .frame(height: 8)
             HStack(spacing: 4) {

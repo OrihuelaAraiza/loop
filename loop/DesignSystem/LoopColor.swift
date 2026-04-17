@@ -24,6 +24,9 @@ extension Color {
     static let borderSoft = Color(hex: "ADBDFF").opacity(0.08)
     static let borderMid = Color(hex: "ADBDFF").opacity(0.16)
 
+    // Tracks (slider / progress inactivo)
+    static let trackInactive = Color(hex: "2A2F50")
+
     init(hex: String) {
         let sanitized = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
