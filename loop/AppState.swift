@@ -36,6 +36,7 @@ final class AppState: ObservableObject {
     /// Cierra la sesion y limpia todo el progreso local para probar el flujo completo de nuevo.
     func resetForOnboarding() {
         hasCompletedOnboarding = false
+        JuniorModeManager.shared.isActive = false
         userProfile = UserProfile()
         gameState.apply(GameStateSnapshot(
             currentStreak: 0,

@@ -30,6 +30,7 @@ private struct MapScrollOffsetKey: PreferenceKey {
 }
 
 struct MapView: View {
+    @Environment(\.isJuniorMode) private var isJuniorMode
     @State private var reveal = false
     @State private var selectedRouteID: UUID?
     @State private var scrollOffset: CGFloat = 0
@@ -170,7 +171,7 @@ struct MapView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Mapa")
+            Text(LoopCopy.mapTitle(junior: isJuniorMode))
                 .font(LoopFont.black(30))
                 .foregroundColor(.textPrimary)
             Text("Avanza nodo por nodo. Cada leccion desbloquea la siguiente en tu mapa.")
@@ -284,6 +285,7 @@ private struct RoadmapRow: View {
     let index: Int
     let total: Int
 
+    @Environment(\.isJuniorMode) private var isJuniorMode
     @State private var pulse = false
     @State private var connectorProgress: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -430,9 +432,9 @@ private struct RoadmapRow: View {
 
     private var stateLabel: String {
         switch node.state {
-        case .completed: return "Completado"
-        case .active: return "Continua aqui"
-        case .locked: return "Bloqueado"
+        case .completed: return LoopCopy.completedLabel(junior: isJuniorMode)
+        case .active: return LoopCopy.continueHereLabel(junior: isJuniorMode)
+        case .locked: return LoopCopy.lockedLabel(junior: isJuniorMode)
         }
     }
 

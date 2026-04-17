@@ -2,10 +2,10 @@ import Foundation
 
 enum ExerciseType: String, Codable {
     case fillInBlank
-    case dragDrop
+    case dragAndDrop
     case debug
     case trivia
-    case project
+    case miniProject
 }
 
 struct Lesson: Identifiable, Codable {

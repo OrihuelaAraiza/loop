@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.isJuniorMode) private var isJuniorMode
     @StateObject private var viewModel = HomeViewModel()
     @State private var revealCards = false
 
@@ -67,19 +68,16 @@ struct HomeView: View {
                 HStack {
                     homePill(icon: "sparkles", text: "Mentor del dia")
                     Spacer()
-                    Text("Racha \(appState.gameState.currentStreak)")
+                    Text("\(LoopCopy.streakLabel(junior: isJuniorMode)): \(appState.gameState.currentStreak)")
                         .font(LoopFont.bold(12))
                         .foregroundColor(.loopGold)
                 }
 
                 HStack(alignment: .center, spacing: Spacing.md) {
-                    LoopyView(mood: .idle)
-                        .scaleEffect(0.46)
-                        .frame(width: 72, height: 72)
-                        .clipped()
+                    LoopyExpressionView(expression: .idle, size: isJuniorMode ? 100 : 80)
+                        .frame(width: isJuniorMode ? 100 : 80, height: isJuniorMode ? 108 : 86)
                     LoopySpeechBubble(
-                        primary: "Hola \(learnerName), llevas \(appState.gameState.currentStreak) dias seguidos.",
-                        secondary: "Tu leccion del dia esta lista, cuando quieras empezar."
+                        primary: "Hola \(learnerName), \(LoopCopy.streakMessage(days: appState.gameState.currentStreak, junior: isJuniorMode))"
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -133,7 +131,7 @@ struct HomeView: View {
         LoopCard(accentColor: .loopGold.opacity(0.6), usesGlassSurface: true) {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 HStack(alignment: .center) {
-                    Text("Racha semanal")
+                    Text(isJuniorMode ? "Dias seguidos de la semana" : "Racha semanal")
                         .font(LoopFont.bold(14))
                         .foregroundColor(.textSecond)
                         .textCase(.uppercase)
@@ -175,7 +173,7 @@ struct HomeView: View {
                             font: LoopFont.bold(14),
                             color: Color.mint
                         )
-                        Text(" / \(appState.gameState.dailyGoal) XP")
+                        Text(" / \(appState.gameState.dailyGoal) \(LoopCopy.xpLabel(junior: isJuniorMode))")
                             .font(LoopFont.bold(14))
                             .foregroundColor(Color.mint)
                     }
@@ -283,7 +281,7 @@ struct HomeView: View {
                 value: appState.gameState.totalXP,
                 font: LoopFont.bold(12),
                 color: Color.textPrimary,
-                suffix: " XP"
+                suffix: " \(LoopCopy.xpLabel(junior: isJuniorMode))"
             )
         }
         .padding(.horizontal, Spacing.md)

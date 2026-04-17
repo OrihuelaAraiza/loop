@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RoutesView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.isJuniorMode) private var isJuniorMode
     @StateObject private var viewModel = HomeViewModel()
     @State private var revealCards = false
 
@@ -41,7 +42,7 @@ struct RoutesView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Rutas")
+            Text(LoopCopy.routesTitle(junior: isJuniorMode))
                 .font(LoopFont.black(28))
                 .foregroundColor(.textPrimary)
             Text("Elige donde continuar. Cada ruta guarda tu avance por modulo.")
@@ -99,7 +100,9 @@ struct RoutesView: View {
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text(course.isActive ? "En foco" : "En cola")
+                    Text(course.isActive
+                         ? LoopCopy.focusLabel(junior: isJuniorMode)
+                         : LoopCopy.queueLabel(junior: isJuniorMode))
                         .font(LoopFont.bold(10))
                         .foregroundColor(course.isActive ? .coral : .textSecond)
                         .padding(.horizontal, 8)

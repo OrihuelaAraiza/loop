@@ -540,8 +540,10 @@ private struct OnboardingAgeView: View {
                 age: Binding(
                     get: { viewModel.userProfile.age },
                     set: { newAge in
-                        viewModel.userProfile.age = min(max(newAge, 4), 99)
+                        let clampedAge = min(max(newAge, 4), 99)
+                        viewModel.userProfile.age = clampedAge
                         viewModel.userProfile.ageRange = AgeRange.from(age: viewModel.userProfile.age)
+                        JuniorModeManager.shared.configure(forAge: clampedAge)
                     }
                 )
             )
@@ -825,6 +827,10 @@ private struct AgeAdjustButton: View {
 private struct OnboardingGoalView: View {
     @ObservedObject var viewModel: OnboardingViewModel
 
+    private var isJuniorMode: Bool {
+        viewModel.userProfile.age < 13
+    }
+
     var body: some View {
         OnboardingContainer(title: "Objetivo principal", subtitle: "Elegimos una ruta basada en lo que quieres lograr.", eyebrow: "Objetivo") {
             Text("Tu objetivo define el tono del plan, el tipo de ejercicios y la forma en la que te medimos avance.")
@@ -862,7 +868,7 @@ private struct OnboardingGoalView: View {
                         )
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(goal.rawValue).font(LoopFont.bold(15)).foregroundColor(.textPrimary)
+                        Text(LoopCopy.goalName(goal, junior: isJuniorMode)).font(LoopFont.bold(15)).foregroundColor(.textPrimary)
                         Text(detail).font(LoopFont.regular(13)).foregroundColor(.textSecond)
                             .fixedSize(horizontal: false, vertical: true)
                     }

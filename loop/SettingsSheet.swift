@@ -4,6 +4,7 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var appState: AppState
 
+    @State private var juniorMode = JuniorModeManager.shared
     @State private var notificationsEnabled = true
     @State private var hapticsEnabled = true
     @State private var soundEnabled = true
@@ -48,6 +49,14 @@ struct SettingsSheet: View {
             Button("Cancelar", role: .cancel) {}
         } message: {
             Text("Se borrara tu perfil, racha y XP local, y volveras al flujo de onboarding. Util para pruebas.")
+        }
+        .onAppear {
+            if juniorMode.isActive {
+                appState.userProfile.cardBadge = IdentityCardBadge.normalizedForJunior(
+                    appState.userProfile.cardBadge,
+                    junior: true
+                )
+            }
         }
     }
 
@@ -132,12 +141,29 @@ struct SettingsSheet: View {
                     value: appState.gameState.dailyGoal,
                     range: 10 ... 100,
                     step: 5,
-                    suffix: "XP"
+                    suffix: LoopCopy.xpLabel(junior: juniorMode.isActive)
                 ) { newValue in
                     appState.gameState.dailyGoal = newValue
                 }
                 divider
                 activeDaysRow
+                divider
+                toggleRow(
+                    title: "Modo Junior",
+                    subtitle: "Adapta copy y presentacion para perfiles menores de 13.",
+                    isOn: Binding(
+                        get: { juniorMode.isActive },
+                        set: { newValue in
+                            juniorMode.isActive = newValue
+                            if newValue {
+                                appState.userProfile.cardBadge = IdentityCardBadge.normalizedForJunior(
+                                    appState.userProfile.cardBadge,
+                                    junior: true
+                                )
+                            }
+                        }
+                    )
+                )
             }
         }
     }

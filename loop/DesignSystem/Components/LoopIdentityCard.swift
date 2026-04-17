@@ -29,6 +29,7 @@ struct LoopIdentityCard: View {
     var isCustomizerPresented = false
     var onCustomize: () -> Void = {}
 
+    @Environment(\.isJuniorMode) private var isJuniorMode
     @StateObject private var motion = LoopTiltMotionManager()
     @State private var isFlipped = false
     @State private var dragPitch: Double = 0
@@ -128,12 +129,12 @@ struct LoopIdentityCard: View {
 
                 ViewThatFits(in: .vertical) {
                     HStack(spacing: Spacing.sm) {
-                        infoTile(label: "Objetivo", value: userProfile.goal.rawValue)
+                        infoTile(label: "Objetivo", value: LoopCopy.goalName(userProfile.goal, junior: isJuniorMode))
                         infoTile(label: "Nivel", value: userProfile.knowledgeLevel.rawValue)
                     }
 
                     VStack(spacing: Spacing.sm) {
-                        infoTile(label: "Objetivo", value: userProfile.goal.rawValue)
+                        infoTile(label: "Objetivo", value: LoopCopy.goalName(userProfile.goal, junior: isJuniorMode))
                         infoTile(label: "Nivel", value: userProfile.knowledgeLevel.rawValue)
                     }
                 }
@@ -220,7 +221,7 @@ struct LoopIdentityCard: View {
 
     private var identityHeader: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(userProfile.cardBadge.rawValue.uppercased())
+            Text(displayBadge.rawValue.uppercased())
                 .font(LoopFont.bold(11))
                 .foregroundColor(.white.opacity(0.7))
             Text(identityTitle)
@@ -385,7 +386,7 @@ struct LoopIdentityCard: View {
             )
             .lineLimit(1)
             .minimumScaleFactor(0.82)
-            Text("XP")
+            Text(LoopCopy.xpLabel(junior: isJuniorMode))
                 .font(LoopFont.semiBold(11))
                 .foregroundColor(.white.opacity(0.68))
         }
@@ -518,7 +519,11 @@ struct LoopIdentityCard: View {
     }
 
     private var backSummary: String {
-        "Estas construyendo una identidad de \(identityTitle.lowercased()) con badge \(userProfile.cardBadge.rawValue.lowercased()), \(userProfile.minutesPerDay) minutos por sesion y una racha de \(gameState.currentStreak) dias."
+        "Estas construyendo una identidad de \(identityTitle.lowercased()) con badge \(displayBadge.rawValue.lowercased()), \(userProfile.minutesPerDay) minutos por sesion y una racha de \(gameState.currentStreak) dias."
+    }
+
+    private var displayBadge: IdentityCardBadge {
+        IdentityCardBadge.normalizedForJunior(userProfile.cardBadge, junior: isJuniorMode)
     }
 
     private var cardInteractionHint: String {

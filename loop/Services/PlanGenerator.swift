@@ -50,7 +50,8 @@ enum PlanGenerator {
     }
 
     private static func reasonForLanguage(_ profile: UserProfile) -> String {
-        "Priorizamos \(ProgrammingLanguage.python.rawValue) para darte una curva de aprendizaje amigable según tu objetivo \(profile.goal.rawValue.lowercased())."
+        let goal = LoopCopy.goalName(profile.goal, junior: profile.age < 13).lowercased()
+        return "Priorizamos \(ProgrammingLanguage.python.rawValue) para darte una curva de aprendizaje amigable según tu objetivo \(goal)."
     }
 
     private static func reasonForRhythm(_ profile: UserProfile) -> String {

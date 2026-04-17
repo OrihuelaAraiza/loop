@@ -47,6 +47,7 @@ struct MainTabView: View {
 
 private struct ProfileView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.isJuniorMode) private var isJuniorMode
     @State private var showCustomizerSheet = false
     @State private var showSettingsSheet = false
 
@@ -58,7 +59,7 @@ private struct ProfileView: View {
                     VStack(alignment: .leading, spacing: Spacing.lg) {
                         HStack(alignment: .top, spacing: Spacing.md) {
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("Perfil")
+                                Text(LoopCopy.profileTitle(junior: isJuniorMode))
                                     .font(LoopFont.black(28))
                                     .foregroundColor(.textPrimary)
                                 Text("Tu tarjeta vive aqui. Tocala para girarla, arrastrarla y abre ajustes desde Editar.")
@@ -99,12 +100,12 @@ private struct ProfileView: View {
                     ViewThatFits(in: .vertical) {
                         HStack(spacing: Spacing.md) {
                             statCard(title: "Nivel", value: "\(appState.gameState.level)", tint: .periwinkle)
-                            statCard(title: "XP total", value: "\(appState.gameState.totalXP)", tint: .loopGold)
+                            statCard(title: "\(LoopCopy.xpLabel(junior: isJuniorMode)) total", value: "\(appState.gameState.totalXP)", tint: .loopGold)
                         }
 
                         VStack(spacing: Spacing.md) {
                             statCard(title: "Nivel", value: "\(appState.gameState.level)", tint: .periwinkle)
-                            statCard(title: "XP total", value: "\(appState.gameState.totalXP)", tint: .loopGold)
+                            statCard(title: "\(LoopCopy.xpLabel(junior: isJuniorMode)) total", value: "\(appState.gameState.totalXP)", tint: .loopGold)
                         }
                     }
 
@@ -160,12 +161,14 @@ private struct ProfileView: View {
         let name = appState.userProfile.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let displayName = name.isEmpty ? "Loop Learner" : name
         let language = appState.userProfile.generatedPlan?.language.rawValue ?? "Python"
-        return "\(displayName) esta en ruta de \(appState.userProfile.goal.rawValue.lowercased()), practicando \(appState.userProfile.minutesPerDay) minutos por sesion en \(language)."
+        let goal = LoopCopy.goalName(appState.userProfile.goal, junior: isJuniorMode).lowercased()
+        return "\(displayName) esta en ruta de \(goal), practicando \(appState.userProfile.minutesPerDay) minutos por sesion en \(language)."
     }
 }
 
 private struct ProfileCustomizationSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isJuniorMode) private var isJuniorMode
     @Binding var userProfile: UserProfile
 
     private func compactSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -201,11 +204,11 @@ private struct ProfileCustomizationSheet: View {
 
                             compactSection(title: "Badge") {
                                 chipGrid(
-                                    options: IdentityCardBadge.allCases.map(\.rawValue),
-                                    selected: userProfile.cardBadge.rawValue,
+                                    options: IdentityCardBadge.availableBadges(junior: isJuniorMode).map(\.rawValue),
+                                    selected: IdentityCardBadge.normalizedForJunior(userProfile.cardBadge, junior: isJuniorMode).rawValue,
                                     tintResolver: badgeTint(label:)
                                 ) { value in
-                                    if let badge = IdentityCardBadge.allCases.first(where: { $0.rawValue == value }) {
+                                    if let badge = IdentityCardBadge.availableBadges(junior: isJuniorMode).first(where: { $0.rawValue == value }) {
                                         userProfile.cardBadge = badge
                                     }
                                 }
@@ -245,6 +248,12 @@ private struct ProfileCustomizationSheet: View {
                 .padding(Spacing.lg)
                 .padding(.bottom, 18)
             }
+        }
+        .onAppear {
+            userProfile.cardBadge = IdentityCardBadge.normalizedForJunior(userProfile.cardBadge, junior: isJuniorMode)
+        }
+        .onChange(of: isJuniorMode) { _, newValue in
+            userProfile.cardBadge = IdentityCardBadge.normalizedForJunior(userProfile.cardBadge, junior: newValue)
         }
     }
 
@@ -436,4 +445,3 @@ private struct ProfileCustomizationSheet: View {
         paletteTint(for: userProfile.cardPalette)
     }
 }
-
