@@ -47,7 +47,13 @@ struct MainTabView: View {
             .environmentObject(appState)
         }
         .onAppear {
+            selected = appState.selectedMainTab
             appState.refreshTodayLesson()
+        }
+        .onChange(of: selected) { _, newTab in
+            if appState.selectedMainTab != newTab {
+                appState.selectedMainTab = newTab
+            }
         }
         .onChange(of: appState.selectedMainTab) { _, newTab in
             withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {

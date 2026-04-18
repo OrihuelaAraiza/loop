@@ -411,8 +411,12 @@ private struct NewRouteComposerSheet: View {
         }
     }
 
+    private var hasEnoughInput: Bool {
+        selectedLanguage != nil || !promptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var canSubmit: Bool {
-        selectedLanguage != nil && !isGenerating
+        hasEnoughInput && !isGenerating
     }
 
     var body: some View {
@@ -711,18 +715,20 @@ private struct NewRouteComposerSheet: View {
             switch phase {
             case .form:
                 VStack(spacing: 12) {
-                    if let selectedLanguage {
+                    if hasEnoughInput {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(RoutePalette.celadon)
 
-                            Text(summaryLine(for: selectedLanguage))
+                            Text(confirmationLine)
                                 .font(.custom("Nunito-SemiBold", size: 14))
                                 .foregroundColor(.white)
+                                .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
 
                     Button {
@@ -802,11 +808,15 @@ private struct NewRouteComposerSheet: View {
         .padding(24)
     }
 
-    private func summaryLine(for language: ProgrammingLanguage) -> String {
-        if selectedFramework == .none {
-            return "Curso de \(language.rawValue)"
+    private var confirmationLine: String {
+        if let lang = selectedLanguage {
+            return selectedFramework == .none
+                ? "Curso de \(lang.rawValue)"
+                : "Curso de \(lang.rawValue) · \(selectedFramework.rawValue)"
         }
-        return "Curso de \(language.rawValue) · \(selectedFramework.rawValue)"
+        let trimmed = promptText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let preview = trimmed.count > 40 ? String(trimmed.prefix(40)) + "…" : trimmed
+        return "Curso personalizado: \(preview)"
     }
 
     private func sectionLabel(title: String, icon: String, tint: Color) -> some View {
@@ -830,10 +840,12 @@ private struct NewRouteComposerSheet: View {
     }
 
     private func generateCourse() {
-        guard let selectedLanguage else { return }
+        let language = selectedLanguage
+            ?? appState.userProfile.generatedPlan?.language
+            ?? .python
 
         let request = CourseGenerationRequest(
-            language: selectedLanguage,
+            language: language,
             framework: selectedFramework,
             prompt: promptText.trimmingCharacters(in: .whitespacesAndNewlines),
             focus: focusText.trimmingCharacters(in: .whitespacesAndNewlines),

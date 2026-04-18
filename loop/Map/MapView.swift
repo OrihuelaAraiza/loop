@@ -16,17 +16,35 @@ struct RoadmapNode: Identifiable {
     let isInteractive: Bool
 }
 
-private struct MapScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+private struct MapCourseEntry: Identifiable {
+    enum MapCourseStatus { case active, queued, generating, failed }
+    let id: String
+    let title: String
+    let language: String
+    let mapStatus: MapCourseStatus
+    let coursePayload: CourseStatusPayload?
+    let courseSnapshot: RouteCourseSnapshot?
+
+    var roadmapSnapshot: RouteCourseSnapshot? {
+        if let coursePayload {
+            return RouteCourseSnapshot(payload: coursePayload)
+        }
+        return courseSnapshot
     }
+}
+
+private struct MapLessonNodeData {
+    let id: String
+    let title: String
+    let orderIndex: Int
+    let status: String
+    let difficulty: String?
 }
 
 struct MapView: View {
     @EnvironmentObject var appState: AppState
-    @State private var reveal = false
-    @State private var scrollOffset: CGFloat = 0
+    @State private var revealByID: [String: Bool] = [:]
+    @State private var selectedCourseID: String? = nil
     @State private var theoryLesson: LessonPayload?
     @State private var practiceLesson: LessonPayload?
     @State private var pendingOpenLessonOrder: Int?
@@ -36,40 +54,59 @@ struct MapView: View {
     var body: some View {
         ZStack(alignment: .top) {
             LoopMeshBackground()
-            ScrollView {
-                GeometryReader { geo in
-                    Color.clear
-                        .preference(
-                            key: MapScrollOffsetKey.self,
-                            value: -geo.frame(in: .named("mapScroll")).minY
-                        )
-                }
-                .frame(height: 0)
+            VStack(spacing: 0) {
+                header
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.top, Spacing.xl)
+                    .padding(.bottom, Spacing.sm)
 
-                VStack(alignment: .leading, spacing: Spacing.lg) {
-                    header
-                    routeSummary
-                        .opacity(expandedHeaderOpacity)
-                    roadmap
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                if courseEntries.count > 1 {
+                    routeTabs
+                        .padding(.bottom, Spacing.sm)
                 }
-                .padding(.horizontal, Spacing.lg)
-                .padding(.top, Spacing.xl)
-                .padding(.bottom, 140)
-            }
-            .coordinateSpace(name: "mapScroll")
-            .onPreferenceChange(MapScrollOffsetKey.self) { offset in
-                scrollOffset = offset
+
+                if courseEntries.count > 1 {
+                    pageIndicator
+                        .padding(.bottom, Spacing.sm)
+                }
+
+                TabView(selection: $selectedCourseID) {
+                    ForEach(courseEntries) { entry in
+                        coursePageView(for: entry)
+                            .tag(entry.id as String?)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
             }
         }
         .onAppear {
             appState.refreshTodayLesson()
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.86).delay(0.05)) {
-                reveal = true
+            autoSelectCourse()
+        }
+        .onChange(of: appState.mapFocusedRouteID) { _, id in
+            guard let id else { return }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                selectedCourseID = id
             }
+            appState.mapFocusedRouteID = nil
+        }
+        .onChange(of: appState.customRoutes) { _, _ in
+            if selectedCourseID == nil { autoSelectCourse() }
+        }
+        .onChange(of: courseEntries.map(\.id)) { _, ids in
+            guard !ids.isEmpty else {
+                selectedCourseID = nil
+                return
+            }
+            if let selectedCourseID, ids.contains(selectedCourseID) {
+                return
+            }
+            self.selectedCourseID = ids.first(where: { id in
+                courseEntries.first(where: { $0.id == id })?.mapStatus == .active
+            }) ?? ids.first
         }
         .onReceive(refreshTimer) { _ in
-            guard isStillGenerating else { return }
+            guard isAnyGenerating else { return }
             appState.refreshTodayLesson()
         }
         .onChange(of: appState.todayLesson?.id) { _, _ in
@@ -81,7 +118,7 @@ struct MapView: View {
         .fullScreenCover(item: $theoryLesson) { lesson in
             LessonTheoryView(
                 lesson: lesson,
-                courseLanguage: appState.currentCourse?.language ?? "Python",
+                courseLanguage: focusedEntry?.language ?? appState.currentCourse?.language ?? "Python",
                 initialStepIndex: appState.lessonProgress(for: lesson.id)?.theoryStepIndex,
                 onStartPractice: {
                     theoryLesson = nil
@@ -108,105 +145,345 @@ struct MapView: View {
         }
     }
 
-    private var expandedHeaderOpacity: Double {
-        max(0, 1 - Double(scrollOffset) / 140)
-    }
+    // MARK: - Course entries
 
-    private var isStillGenerating: Bool {
-        appState.isGeneratingCourse
-    }
+    private var courseEntries: [MapCourseEntry] {
+        var entries: [MapCourseEntry] = []
+        let currentID = appState.currentCourse?.id
+        let activeCustomRouteID = appState.customRoutes.first(where: { $0.status == .active })?.id
 
-    private var courseTitle: String {
-        appState.currentCourse?.generatedCourseTitle ??
-            appState.currentCourse?.title ??
-            "Generando curso..."
-    }
-
-    private var totalLessons: Int {
-        max(appState.currentCourse?.totalLessons ?? 1, 1)
-    }
-
-    private var availableLessons: Int {
-        min(appState.currentCourse?.resolvedAvailableLessons ?? 0, max(totalLessons, 0))
-    }
-
-    private var completedLessonsCount: Int {
-        if let currentCourse = appState.currentCourse, !currentCourse.lessons.isEmpty {
-            let completedStatuses = Set(["completed", "done"])
-            let count = currentCourse.lessons.filter { summary in
-                completedLessonIDs.contains(summary.id) || completedStatuses.contains(summary.status.lowercased())
-            }.count
-            return min(count, max(totalLessons, 0))
+        if let current = appState.currentCourse {
+            if activeCustomRouteID == nil {
+                entries.append(MapCourseEntry(
+                    id: current.id,
+                    title: current.resolvedTitle,
+                    language: current.language,
+                    mapStatus: current.shouldPresentGeneratingState ? .generating : .active,
+                    coursePayload: current,
+                    courseSnapshot: RouteCourseSnapshot(payload: current)
+                ))
+            }
         }
 
-        return min(completedLessonIDs.count, max(totalLessons, 0))
-    }
-
-    private var routeProgress: Double {
-        guard totalLessons > 0 else { return 0 }
-        return min(max(Double(completedLessonsCount) / Double(max(totalLessons, 1)), 0), 1)
-    }
-
-    private var generatedDescription: String {
-        if let description = appState.currentCourse?.generatedDescription,
-           !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return description
+        for route in appState.customRoutes {
+            let isActive = route.status == .active
+            let status: MapCourseEntry.MapCourseStatus
+            switch route.status {
+            case .generating: status = .generating
+            case .queued:     status = .queued
+            case .active:     status = isActive ? .active : .queued
+            case .failed:     status = .failed
+            }
+            let livePayload = isActive && route.backendCourseID == currentID ? appState.currentCourse : nil
+            let snapshot = livePayload.map(RouteCourseSnapshot.init(payload:)) ?? route.courseSnapshot
+            entries.append(MapCourseEntry(
+                id: route.id,
+                title: snapshot?.resolvedTitle ?? route.title,
+                language: snapshot?.language ?? route.request.language.rawValue,
+                mapStatus: status,
+                coursePayload: livePayload,
+                courseSnapshot: snapshot
+            ))
         }
 
-        if isStillGenerating {
-            return "Tu ruta se va construyendo en vivo. Apenas se genera una leccion, se desbloquea aqui."
-        }
+        return entries
+    }
 
-        return "Ruta lista. Avanza teoria + practica para desbloquear nuevas lecciones."
+    private var focusedEntry: MapCourseEntry? {
+        if let id = selectedCourseID, let entry = courseEntries.first(where: { $0.id == id }) {
+            return entry
+        }
+        return courseEntries.first(where: { $0.mapStatus == .active }) ?? courseEntries.first
+    }
+
+    private func autoSelectCourse() {
+        guard selectedCourseID == nil else { return }
+        selectedCourseID = courseEntries.first(where: { $0.mapStatus == .active })?.id
+            ?? courseEntries.first?.id
+    }
+
+    private var isAnyGenerating: Bool {
+        courseEntries.contains { $0.mapStatus == .generating } ||
+            (focusedEntry?.mapStatus == .active && appState.isGeneratingCourse)
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Mapa")
+                .font(LoopFont.black(30))
+                .foregroundColor(.textPrimary)
+            Text(courseEntries.count > 1
+                 ? "Desliza entre tus rutas y revisa cada roadmap en su propia pestaña."
+                 : "Tu curso se construye en vivo. Cada nodo desbloquea teoria y luego ejercicios.")
+                .font(LoopFont.regular(13))
+                .foregroundColor(.textSecond)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var routeTabs: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(courseEntries) { entry in
+                    Button {
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                            selectedCourseID = entry.id
+                        }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(entry.title)
+                                .font(LoopFont.bold(13))
+                                .lineLimit(1)
+                            Text(routeTabSubtitle(for: entry))
+                                .font(LoopFont.regular(11))
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(focusedEntry?.id == entry.id ? .white : .textSecond)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: Radius.lg)
+                                .fill(focusedEntry?.id == entry.id ? Color.coral.opacity(0.24) : Color.loopSurf2.opacity(0.7))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Radius.lg)
+                                .stroke(focusedEntry?.id == entry.id ? Color.coral.opacity(0.5) : Color.borderSoft, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, Spacing.lg)
+        }
+    }
+
+    // MARK: - Page indicator
+
+    private var pageIndicator: some View {
+        HStack(spacing: 6) {
+            ForEach(courseEntries) { entry in
+                Capsule()
+                    .fill(focusedEntry?.id == entry.id ? Color.coral : Color.periwinkle.opacity(0.3))
+                    .frame(width: focusedEntry?.id == entry.id ? 20 : 6, height: 6)
+                    .animation(.spring(duration: 0.3), value: focusedEntry?.id)
+            }
+        }
+    }
+
+    // MARK: - Course page
+
+    private func coursePageView(for entry: MapCourseEntry) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
+                routeSummaryCard(for: entry)
+                roadmapSection(for: entry, revealed: revealByID[entry.id] ?? false)
+            }
+            .padding(.horizontal, Spacing.lg)
+            .padding(.top, Spacing.md)
+            .padding(.bottom, 140)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.86).delay(0.05)) {
+                revealByID[entry.id] = true
+            }
+        }
+    }
+
+    // MARK: - Summary card
+
+    private func routeSummaryCard(for entry: MapCourseEntry) -> some View {
+        let total = totalLessons(for: entry)
+        let completed = completedLessonsCount(for: entry)
+        let available = availableLessons(for: entry)
+        let progress = routeProgress(for: entry)
+        let generating = isGenerating(for: entry)
+        return LoopCard(accentColor: .coral, showsSceneAccent: true, usesGlassSurface: true) {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(entry.title)
+                            .font(LoopFont.bold(18))
+                            .foregroundColor(.textPrimary)
+                        Text(generatedDescription(for: entry))
+                            .font(LoopFont.regular(12))
+                            .foregroundColor(.textSecond)
+                            .lineLimit(3)
+                    }
+                    Spacer()
+                    Text("\(Int(progress * 100))%")
+                        .font(LoopFont.bold(16))
+                        .foregroundColor(.coral)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.coral.opacity(0.16))
+                        .clipShape(Capsule())
+                }
+                LoopProgressBar(progress: progress, height: 10)
+                HStack {
+                    Text("Completadas: \(completed)/\(total)")
+                        .font(LoopFont.regular(12))
+                        .foregroundColor(.textSecond)
+                    Spacer()
+                    Text("Disponibles: \(available)/\(total)")
+                        .font(LoopFont.bold(11))
+                        .foregroundColor(generating ? .loopGold : .coral)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    // MARK: - Roadmap section
+
+    private func roadmapSection(for entry: MapCourseEntry, revealed: Bool) -> some View {
+        let nodes = roadmapNodes(for: entry)
+        return VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text("Roadmap")
+                .font(LoopFont.bold(16))
+                .foregroundColor(.textPrimary)
+                .textCase(.uppercase)
+                .tracking(0.8)
+
+            LoopCard(accentColor: .clear, usesGlassSurface: true) {
+                VStack(spacing: 0) {
+                    ForEach(Array(nodes.enumerated()), id: \.element.id) { index, node in
+                        RoadmapRow(
+                            node: node,
+                            tint: .coral,
+                            index: index,
+                            total: nodes.count,
+                            onTap: { handleNodeTap(node) }
+                        )
+                        .scaleEffect(revealed ? 1 : 0.96)
+                        .opacity(revealed ? 1 : 0)
+                        .animation(
+                            .spring(response: 0.55, dampingFraction: 0.85).delay(Double(index) * 0.06),
+                            value: revealed
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    // MARK: - Per-entry computed values
+
+    private var completedLessonIDs: Set<String> {
+        appState.gameState.completedLessons
     }
 
     private var todayOrderIndex: Int? {
         appState.todayLesson?.orderIndex
     }
 
-    private var completedLessonIDs: Set<String> {
-        appState.gameState.completedLessons
+    private func totalLessons(for entry: MapCourseEntry) -> Int {
+        max(entry.roadmapSnapshot?.totalLessons ?? 0, 0)
     }
 
-    private var roadmapNodes: [RoadmapNode] {
-        let summaries = (appState.currentCourse?.lessons ?? []).sorted { $0.orderIndex < $1.orderIndex }
+    private func availableLessons(for entry: MapCourseEntry) -> Int {
+        let total = totalLessons(for: entry)
+        return min(entry.roadmapSnapshot?.resolvedAvailableLessons ?? 0, max(total, 0))
+    }
 
-        // If backend already sent the real lesson list, use that.
-        if !summaries.isEmpty {
-            var activeNodeAssigned = false
+    private func completedLessonsCount(for entry: MapCourseEntry) -> Int {
+        let total = totalLessons(for: entry)
+        if let payload = entry.coursePayload, !payload.lessons.isEmpty {
+            let completedStatuses = Set(["completed", "done"])
+            return min(
+                payload.lessons.filter { completedLessonIDs.contains($0.id) || completedStatuses.contains($0.status.lowercased()) }.count,
+                max(total, 0)
+            )
+        }
+        if let snapshot = entry.roadmapSnapshot, !snapshot.lessons.isEmpty {
+            let completedStatuses = Set(["completed", "done"])
+            return min(
+                snapshot.lessons.filter {
+                    completedStatuses.contains($0.status.lowercased()) ||
+                    (entry.mapStatus == .active && completedLessonIDs.contains($0.id))
+                }.count,
+                max(total, 0)
+            )
+        }
+        return min(completedLessonIDs.count, max(total, 0))
+    }
 
-            return summaries.map { summary in
-                let completed = isCompleted(summary)
-                let canActivate = !activeNodeAssigned && isActivatable(summary)
-                let state: RoadmapNodeState
+    private func routeProgress(for entry: MapCourseEntry) -> Double {
+        let total = totalLessons(for: entry)
+        guard total > 0 else { return 0 }
+        return min(max(Double(completedLessonsCount(for: entry)) / Double(total), 0), 1)
+    }
 
-                if completed {
-                    state = .completed
-                } else if canActivate {
-                    state = .active
-                    activeNodeAssigned = true
-                } else {
-                    state = .locked
-                }
+    private func isGenerating(for entry: MapCourseEntry) -> Bool {
+        entry.mapStatus == .generating ||
+            (entry.mapStatus == .active && appState.isGeneratingCourse)
+    }
 
-                let isInteractive = state == .active
-
-                return RoadmapNode(
-                    id: summary.id.isEmpty ? "lesson-\(summary.orderIndex)" : summary.id,
-                    order: summary.orderIndex,
-                    title: summary.title.isEmpty ? "Leccion \(summary.orderIndex)" : summary.title,
-                    icon: "book.fill",
-                    state: state,
-                    isInteractive: isInteractive
-                )
+    private func generatedDescription(for entry: MapCourseEntry) -> String {
+        switch entry.mapStatus {
+        case .generating:
+            if let summary = entry.roadmapSnapshot?.resolvedSummary,
+               !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return summary
             }
+            return "Tu ruta se va construyendo en vivo. Apenas se genera una leccion, se desbloquea aqui."
+        case .queued:
+            if let summary = entry.roadmapSnapshot?.resolvedSummary,
+               !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return "\(summary) Esta ruta permanece visible mientras espera turno."
+            }
+            return "Este curso está en cola. Cuando el activo avance, este se activará automáticamente."
+        case .failed:
+            return "Hubo un problema generando este curso. Intenta crear una nueva ruta."
+        case .active:
+            if let desc = entry.coursePayload?.generatedDescription,
+               !desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return desc
+            }
+            if let summary = entry.roadmapSnapshot?.resolvedSummary,
+               !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return summary
+            }
+            return "Ruta lista. Avanza teoria + practica para desbloquear nuevas lecciones."
+        }
+    }
+
+    // MARK: - Roadmap nodes
+
+    private func roadmapNodes(for entry: MapCourseEntry) -> [RoadmapNode] {
+        if entry.mapStatus == .failed {
+            return []
         }
 
-        // Fallback: no lesson list (older server or course not yet built)
-        let completedCount = min(completedLessonIDs.count, totalLessons)
-        let activeOrder = completedCount < totalLessons ? completedCount + 1 : nil
+        let lessonData = roadmapLessonData(for: entry)
+        if !lessonData.isEmpty {
+            return buildRoadmapNodes(from: lessonData, for: entry)
+        }
 
-        return (1 ... totalLessons).map { index in
+        switch entry.mapStatus {
+        case .generating:
+            return (1...6).map { i in
+                RoadmapNode(id: "gen-\(entry.id)-\(i)", order: i, title: "Generando módulo \(i)...", icon: "sparkles", state: .locked, isInteractive: false)
+            }
+        case .queued:
+            return (1...max(totalLessons(for: entry), 5)).map { i in
+                RoadmapNode(id: "queued-\(entry.id)-\(i)", order: i, title: "Módulo \(i)", icon: "lock.fill", state: .locked, isInteractive: false)
+            }
+        case .failed:
+            return []
+        case .active:
+            break
+        }
+
+        let total = totalLessons(for: entry)
+        guard total > 0 else { return [] }
+        let completedCount = min(completedLessonIDs.count, total)
+        let activeOrder = completedCount < total ? completedCount + 1 : nil
+
+        return (1...total).map { index in
             let state: RoadmapNodeState
             if let activeOrder {
                 if index < activeOrder || completedCount >= index {
@@ -219,16 +496,13 @@ struct MapView: View {
             } else {
                 state = completedCount >= index ? .completed : .locked
             }
-
             let title: String
             if index == todayOrderIndex, let lessonTitle = appState.todayLesson?.title {
                 title = lessonTitle
             } else {
                 title = "Leccion \(index)"
             }
-
             let isInteractive = state == .active
-
             return RoadmapNode(
                 id: "lesson-\(index)",
                 order: index,
@@ -240,88 +514,66 @@ struct MapView: View {
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Mapa")
-                .font(LoopFont.black(30))
-                .foregroundColor(.textPrimary)
-            Text("Tu curso se construye en vivo. Cada nodo desbloquea teoria y luego ejercicios.")
-                .font(LoopFont.regular(13))
-                .foregroundColor(.textSecond)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var routeSummary: some View {
-        LoopCard(accentColor: .coral, showsSceneAccent: true, usesGlassSurface: true) {
-            VStack(alignment: .leading, spacing: Spacing.sm) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(courseTitle)
-                            .font(LoopFont.bold(18))
-                            .foregroundColor(.textPrimary)
-                        Text(generatedDescription)
-                            .font(LoopFont.regular(12))
-                            .foregroundColor(.textSecond)
-                            .lineLimit(3)
-                    }
-                    Spacer()
-                    Text("\(Int(routeProgress * 100))%")
-                        .font(LoopFont.bold(16))
-                        .foregroundColor(.coral)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.coral.opacity(0.16))
-                        .clipShape(Capsule())
-                }
-                LoopProgressBar(progress: routeProgress, height: 10)
-                HStack {
-                    Text("Completadas: \(completedLessonsCount)/\(totalLessons)")
-                        .font(LoopFont.regular(12))
-                        .foregroundColor(.textSecond)
-                    Spacer()
-                    Text("Disponibles: \(availableLessons)/\(totalLessons)")
-                        .font(LoopFont.bold(11))
-                        .foregroundColor(isStillGenerating ? .loopGold : .coral)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var roadmap: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text("Roadmap")
-                .font(LoopFont.bold(16))
-                .foregroundColor(.textPrimary)
-                .textCase(.uppercase)
-                .tracking(0.8)
-
-            LoopCard(accentColor: .clear, usesGlassSurface: true) {
-                VStack(spacing: 0) {
-                    ForEach(Array(roadmapNodes.enumerated()), id: \.element.id) { index, node in
-                        RoadmapRow(
-                            node: node,
-                            tint: .coral,
-                            index: index,
-                            total: roadmapNodes.count,
-                            onTap: {
-                                handleNodeTap(node)
-                            }
-                        )
-                        .scaleEffect(reveal ? 1 : 0.96)
-                        .opacity(reveal ? 1 : 0)
-                        .animation(
-                            .spring(response: 0.55, dampingFraction: 0.85).delay(Double(index) * 0.06),
-                            value: reveal
-                        )
-                    }
-                }
-                .frame(maxWidth: .infinity)
+    private func roadmapLessonData(for entry: MapCourseEntry) -> [MapLessonNodeData] {
+        if let payload = entry.coursePayload, !payload.lessons.isEmpty {
+            return payload.lessons.map {
+                MapLessonNodeData(
+                    id: $0.id,
+                    title: $0.title,
+                    orderIndex: $0.orderIndex,
+                    status: $0.status,
+                    difficulty: $0.difficulty
+                )
             }
         }
+
+        if let snapshot = entry.roadmapSnapshot, !snapshot.lessons.isEmpty {
+            return snapshot.lessons.map {
+                MapLessonNodeData(
+                    id: $0.id,
+                    title: $0.title,
+                    orderIndex: $0.orderIndex,
+                    status: $0.status,
+                    difficulty: $0.difficulty
+                )
+            }
+        }
+
+        return []
     }
+
+    private func buildRoadmapNodes(from lessons: [MapLessonNodeData], for entry: MapCourseEntry) -> [RoadmapNode] {
+        let orderedLessons = lessons.sorted { $0.orderIndex < $1.orderIndex }
+        var activeNodeAssigned = false
+
+        return orderedLessons.map { lesson in
+            let completed = entry.mapStatus == .active ? isCompleted(lesson) : isPreviewCompleted(lesson)
+            let canActivate = !activeNodeAssigned && (entry.mapStatus == .active ? isActivatable(lesson) : isPreviewReady(lesson))
+
+            let state: RoadmapNodeState
+            if completed {
+                state = .completed
+            } else if canActivate {
+                state = .active
+                activeNodeAssigned = true
+            } else {
+                state = .locked
+            }
+
+            let isInteractive = entry.mapStatus == .active && state == .active
+
+            return RoadmapNode(
+                id: lesson.id.isEmpty ? "lesson-\(entry.id)-\(lesson.orderIndex)" : lesson.id,
+                order: lesson.orderIndex,
+                title: lesson.title.isEmpty ? "Leccion \(lesson.orderIndex)" : lesson.title,
+                icon: "book.fill",
+                state: state,
+                isInteractive: isInteractive
+            )
+        }
+    }
+
+    // MARK: - Lesson interaction
 
     private func openLesson(_ lesson: LessonPayload) {
         let resumeState = appState.lessonProgress(for: lesson.id)
@@ -334,25 +586,36 @@ struct MapView: View {
 
     private func handleNodeTap(_ node: RoadmapNode) {
         guard node.isInteractive else { return }
-
         if let lesson = appState.todayLesson,
            lesson.orderIndex == node.order || lesson.id == node.id {
             openLesson(lesson)
             return
         }
-
         pendingOpenLessonOrder = node.order
         appState.refreshTodayLesson()
     }
 
-    private func isCompleted(_ summary: LessonSummary) -> Bool {
+    private func routeTabSubtitle(for entry: MapCourseEntry) -> String {
+        switch entry.mapStatus {
+        case .active:
+            return "En foco"
+        case .queued:
+            return "En cola"
+        case .generating:
+            return "Generando"
+        case .failed:
+            return "Error"
+        }
+    }
+
+    private func isCompleted(_ summary: MapLessonNodeData) -> Bool {
         let normalizedStatus = summary.status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return completedLessonIDs.contains(summary.id) ||
             normalizedStatus == "completed" ||
             normalizedStatus == "done"
     }
 
-    private func isActivatable(_ summary: LessonSummary) -> Bool {
+    private func isActivatable(_ summary: MapLessonNodeData) -> Bool {
         let normalizedStatus = summary.status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return matchesToday(summary) ||
             normalizedStatus == "ready" ||
@@ -361,7 +624,20 @@ struct MapView: View {
             normalizedStatus == "in_progress"
     }
 
-    private func matchesToday(_ summary: LessonSummary) -> Bool {
+    private func isPreviewCompleted(_ summary: MapLessonNodeData) -> Bool {
+        let normalizedStatus = summary.status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalizedStatus == "completed" || normalizedStatus == "done"
+    }
+
+    private func isPreviewReady(_ summary: MapLessonNodeData) -> Bool {
+        let normalizedStatus = summary.status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalizedStatus == "ready" ||
+            normalizedStatus == "available" ||
+            normalizedStatus == "active" ||
+            normalizedStatus == "in_progress"
+    }
+
+    private func matchesToday(_ summary: MapLessonNodeData) -> Bool {
         summary.id == appState.todayLesson?.id ||
             summary.orderIndex == todayOrderIndex
     }

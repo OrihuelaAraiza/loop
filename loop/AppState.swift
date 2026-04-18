@@ -192,8 +192,6 @@ final class AppState: ObservableObject {
         customRoutes.append(record)
         persistCustomRoutes()
         courseSyncErrorMessage = nil
-        todayLesson = nil
-        isGeneratingCourse = true
 
         var updatedProfile = userProfile
         let basePlan = updatedProfile.generatedPlan ?? PlanGenerator.generatePlan(from: updatedProfile)
@@ -219,6 +217,7 @@ final class AppState: ObservableObject {
 
             updateCustomRoute(recordID: record.id) { route in
                 route.backendCourseID = generated.course.id
+                route.courseSnapshot = RouteCourseSnapshot(payload: generated.course)
                 route.status = generated.course.shouldPresentGeneratingState ? .queued : .active
             }
 
@@ -427,14 +426,21 @@ final class AppState: ObservableObject {
         guard !customRoutes.isEmpty else { return }
 
         let activeCourseID = course?.id
+        let activeRouteIndex = newestRouteIndex(matching: activeCourseID)
         var didChange = false
 
         for index in customRoutes.indices {
             let nextStatus: CustomRouteStatus
 
-            if let activeCourseID, customRoutes[index].backendCourseID == activeCourseID {
+            if index == activeRouteIndex {
                 nextStatus = .active
+            } else if customRoutes[index].status == .failed {
+                continue
+            } else if customRoutes[index].backendCourseID == nil {
+                continue
             } else if customRoutes[index].status == .active || customRoutes[index].status == .generating {
+                nextStatus = .queued
+            } else if let activeCourseID, customRoutes[index].backendCourseID == activeCourseID {
                 nextStatus = .queued
             } else {
                 continue
@@ -447,8 +453,32 @@ final class AppState: ObservableObject {
             }
         }
 
+        if let activeRouteIndex, let course {
+            let snapshot = RouteCourseSnapshot(payload: course)
+            if customRoutes[activeRouteIndex].courseSnapshot != snapshot {
+                customRoutes[activeRouteIndex].courseSnapshot = snapshot
+                customRoutes[activeRouteIndex].updatedAt = Date()
+                didChange = true
+            }
+        }
+
         guard didChange else { return }
         persistCustomRoutes()
+    }
+
+    private func newestRouteIndex(matching backendCourseID: String?) -> Int? {
+        guard let backendCourseID else { return nil }
+
+        return customRoutes.indices
+            .filter { customRoutes[$0].backendCourseID == backendCourseID }
+            .max { lhs, rhs in
+                let left = customRoutes[lhs]
+                let right = customRoutes[rhs]
+                if left.updatedAt == right.updatedAt {
+                    return left.createdAt < right.createdAt
+                }
+                return left.updatedAt < right.updatedAt
+            }
     }
 
     private func ensureCourseAndLessonLoaded() async {
@@ -519,6 +549,34 @@ struct AuthSession: Codable, Equatable {
         case apple
         case password
         case mockApple
+    }
+}
+
+extension RouteCourseSnapshot {
+    init(payload: CourseStatusPayload) {
+        self.init(
+            id: payload.id,
+            status: payload.status,
+            title: payload.title,
+            language: payload.language,
+            totalLessons: payload.totalLessons,
+            lessonStatusCounts: payload.lessonStatusCounts,
+            lessons: payload.lessons.map {
+                RouteLessonSnapshot(
+                    id: $0.id,
+                    title: $0.title,
+                    orderIndex: $0.orderIndex,
+                    status: $0.status,
+                    estimatedMinutes: $0.estimatedMinutes,
+                    xpReward: $0.xpReward,
+                    difficulty: $0.difficulty
+                )
+            },
+            generatedCourseTitle: payload.generatedCourseTitle,
+            generatedDescription: payload.generatedDescription,
+            generatedObjectives: payload.generatedObjectives,
+            generatedModulesCount: payload.generatedModulesCount
+        )
     }
 }
 

@@ -159,6 +159,92 @@ struct CourseGenerationRequest: Codable, Equatable {
     }
 }
 
+struct RouteLessonSnapshot: Codable, Equatable, Identifiable {
+    let id: String
+    let title: String
+    let orderIndex: Int
+    let status: String
+    let estimatedMinutes: Int?
+    let xpReward: Int?
+    let difficulty: String?
+}
+
+struct RouteCourseSnapshot: Codable, Equatable {
+    let id: String
+    let status: String
+    let title: String
+    let language: String
+    let totalLessons: Int
+    let lessonStatusCounts: [String: Int]
+    let lessons: [RouteLessonSnapshot]
+    let generatedCourseTitle: String?
+    let generatedDescription: String?
+    let generatedObjectives: [String]
+    let generatedModulesCount: Int?
+
+    var resolvedTitle: String {
+        if let generatedCourseTitle,
+           !generatedCourseTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           generatedCourseTitle.lowercased() != "generando curso..." {
+            return generatedCourseTitle
+        }
+        if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return title
+        }
+        return "Curso personalizado"
+    }
+
+    var resolvedSummary: String {
+        if let generatedDescription,
+           !generatedDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return generatedDescription
+        }
+        if !generatedObjectives.isEmpty {
+            return generatedObjectives.prefix(2).joined(separator: " · ")
+        }
+
+        switch status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "draft", "generating":
+            return "Generando tu curso personalizado..."
+        case "ready_first_lesson":
+            return "Tu primera lección está lista. Sigue avanzando."
+        case "ready_full":
+            return "Ruta completa. Avanza módulo por módulo."
+        case "failed":
+            return "Hubo un problema generando el curso."
+        default:
+            return "Tu ruta personalizada de aprendizaje."
+        }
+    }
+
+    var resolvedAvailableLessons: Int {
+        if !lessons.isEmpty {
+            let availableStatuses = Set(["ready", "available", "active", "in_progress", "completed", "done"])
+            return min(lessons.filter { availableStatuses.contains($0.status.lowercased()) }.count, max(totalLessons, 0))
+        }
+
+        let availableStatuses = Set(["ready", "available", "active", "in_progress", "completed", "done"])
+        let total = availableStatuses.reduce(0) { partialResult, status in
+            partialResult + (lessonStatusCounts[status] ?? 0)
+        }
+        return min(total, max(totalLessons, 0))
+    }
+
+    var shouldPresentGeneratingState: Bool {
+        let normalizedStatus = status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch normalizedStatus {
+        case "ready_first_lesson", "ready_full":
+            return false
+        case "draft", "generating", "queued", "pending":
+            return true
+        case "failed":
+            return false
+        default:
+            return resolvedAvailableLessons == 0
+        }
+    }
+}
+
 enum CustomRouteStatus: String, Codable, Equatable {
     case generating
     case queued
@@ -182,6 +268,7 @@ struct CustomRouteRecord: Codable, Equatable, Identifiable {
     let id: String
     var request: CourseGenerationRequest
     var backendCourseID: String?
+    var courseSnapshot: RouteCourseSnapshot?
     var status: CustomRouteStatus
     var createdAt: Date
     var updatedAt: Date
@@ -190,6 +277,7 @@ struct CustomRouteRecord: Codable, Equatable, Identifiable {
         id: String = UUID().uuidString,
         request: CourseGenerationRequest,
         backendCourseID: String? = nil,
+        courseSnapshot: RouteCourseSnapshot? = nil,
         status: CustomRouteStatus,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
@@ -197,12 +285,16 @@ struct CustomRouteRecord: Codable, Equatable, Identifiable {
         self.id = id
         self.request = request
         self.backendCourseID = backendCourseID
+        self.courseSnapshot = courseSnapshot
         self.status = status
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
 
     var title: String {
+        if let snapshot = courseSnapshot {
+            return snapshot.resolvedTitle
+        }
         if !request.trimmedPrompt.isEmpty {
             return request.trimmedPrompt
         }
@@ -210,6 +302,9 @@ struct CustomRouteRecord: Codable, Equatable, Identifiable {
     }
 
     var subtitle: String {
+        if let snapshot = courseSnapshot {
+            return snapshot.resolvedSummary
+        }
         if !request.trimmedFocus.isEmpty {
             return request.trimmedFocus
         }
