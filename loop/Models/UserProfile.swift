@@ -48,6 +48,7 @@ enum ProgrammingLanguage: String, Codable, CaseIterable, Identifiable {
     case typescript = "TypeScript"
     case swift = "Swift"
     case kotlin = "Kotlin"
+    case rust = "Rust"
     case go = "Go"
     case html = "HTML"
     var id: String { rawValue }

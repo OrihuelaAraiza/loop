@@ -30,6 +30,15 @@ enum LoopToast {
         )
     }
 
+    static func routeReady() {
+        SPAlert.present(
+            title: "Ruta lista",
+            message: "Tu nuevo curso está listo",
+            preset: .done,
+            haptic: .none
+        )
+    }
+
     static func lessonComplete(xp: Int) {
         SPAlert.present(
             title: "Lección completa",

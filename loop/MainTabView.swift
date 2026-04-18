@@ -49,6 +49,11 @@ struct MainTabView: View {
         .onAppear {
             appState.refreshTodayLesson()
         }
+        .onChange(of: appState.selectedMainTab) { _, newTab in
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                selected = newTab
+            }
+        }
     }
 }
 

@@ -1,10 +1,13 @@
+import SkeletonUI
 import SwiftUI
 
 struct RoutesView: View {
-    @EnvironmentObject var appState: AppState
+    @EnvironmentObject private var appState: AppState
     @Environment(\.isJuniorMode) private var isJuniorMode
+
     @State private var revealCards = false
     @State private var showComposer = false
+    @State private var carouselPositionID: String?
 
     private var currentCourse: CourseStatusPayload? {
         appState.currentCourse
@@ -34,597 +37,1257 @@ struct RoutesView: View {
         return min(appState.gameState.completedLessons.count, max(totalLessons, 0))
     }
 
-    private var courseProgress: Double {
-        guard totalLessons > 0 else { return 0 }
-        return min(max(Double(completedLessons) / Double(totalLessons), 0), 1)
+    private var carouselItems: [RouteCarouselItem] {
+        var items: [RouteCarouselItem] = []
+
+        if let currentCourse {
+            items.append(
+                RouteCarouselItem(
+                    id: "focus-\(currentCourse.id)",
+                    kind: .focus,
+                    title: currentCourse.resolvedTitle,
+                    subtitle: currentCourse.resolvedSummary,
+                    language: ProgrammingLanguage(rawValue: currentCourse.language),
+                    frameworkName: nil,
+                    status: .focus,
+                    progress: routeProgress,
+                    moduleLabel: currentModuleLabel,
+                    difficultyStars: currentDifficultyStars,
+                    showsSkeleton: false
+                )
+            )
+        }
+
+        items += createdRoutes.map { route in
+            RouteCarouselItem(
+                id: route.id,
+                kind: .created,
+                title: route.title,
+                subtitle: route.subtitle,
+                language: route.request.language,
+                frameworkName: route.request.frameworkName,
+                status: route.status.displayStatus,
+                progress: progress(for: route),
+                moduleLabel: moduleLabel(for: route),
+                difficultyStars: route.request.level?.stars ?? 1,
+                showsSkeleton: route.status == .generating
+            )
+        }
+
+        items.append(.addCard)
+        return items
     }
 
-    private var courseProgressLabel: String {
-        guard totalLessons > 0 else { return "Sin lecciones disponibles" }
-        return "\(completedLessons) de \(totalLessons) completadas"
+    private var routeProgress: Double {
+        guard totalLessons > 0 else { return 0 }
+        return min(max(Double(completedLessons) / Double(max(totalLessons, 1)), 0), 1)
+    }
+
+    private var currentModuleLabel: String {
+        let modules = max(currentCourse?.generatedModulesCount ?? 1, 1)
+        let lessonOrder = max(appState.todayLesson?.orderIndex ?? (completedLessons + 1), 1)
+        let lessonsPerModule = max(Int(ceil(Double(max(totalLessons, 1)) / Double(modules))), 1)
+        let moduleIndex = min(max(Int(ceil(Double(lessonOrder) / Double(lessonsPerModule))), 1), modules)
+        return "Modulo \(moduleIndex)"
+    }
+
+    private var currentDifficultyStars: Int {
+        difficultyStars(from: appState.todayLesson?.difficulty ?? appState.currentCourse?.lessons.first?.difficulty)
+    }
+
+    private var currentCarouselIndex: Int {
+        guard let carouselPositionID,
+              let index = carouselItems.firstIndex(where: { $0.id == carouselPositionID }) else {
+            return 0
+        }
+        return index
+    }
+
+    private var headerCopy: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(LoopCopy.routesTitle(junior: isJuniorMode))
+                .font(.custom("Nunito-Bold", size: 28))
+                .foregroundColor(.white)
+
+            Text("Crea varias rutas con IA y conserva el curso en foco mientras las nuevas se generan y se encolan.")
+                .font(.custom("Nunito-Regular", size: 14))
+                .foregroundColor(RoutePalette.periwinkle.opacity(0.82))
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     var body: some View {
-        ZStack {
-            AmbientBackground(topColor: .amethyst, bottomColor: .cerulean)
+        GeometryReader { proxy in
+            let cardWidth = max(proxy.size.width * 0.85, 280)
+            let horizontalInset = max((proxy.size.width - cardWidth) / 2, 20)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.lg) {
-                    header
-                    routeBuilderCard
+            ZStack {
+                AmbientBackground(topColor: .amethyst, bottomColor: .cerulean)
 
-                    if !createdRoutes.isEmpty {
-                        customRoutesSection
-                            .scaleEffect(revealCards ? 1 : 0.98)
-                            .opacity(revealCards ? 1 : 0)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        header
+                        carouselSection(cardWidth: cardWidth, horizontalInset: horizontalInset)
+                        routeSummary
                     }
-
-                    LoopCard(accentColor: .coral.opacity(0.55), showsSceneAccent: true, usesGlassSurface: true) {
-                        VStack(alignment: .leading, spacing: Spacing.md) {
-                            sectionHeader(
-                                title: "Ruta activa",
-                                subtitle: "La app sincroniza una ruta principal desde el backend y guarda tu progreso local."
-                            )
-
-                            if let currentCourse {
-                                routeRow(course: currentCourse)
-                                    .scaleEffect(revealCards ? 1 : 0.98)
-                                    .opacity(revealCards ? 1 : 0)
-                            } else {
-                                emptyState
-                                    .scaleEffect(revealCards ? 1 : 0.98)
-                                    .opacity(revealCards ? 1 : 0)
-                            }
-                        }
-                    }
+                    .padding(.top, 20)
+                    .padding(.bottom, 120)
                 }
-                .padding(.horizontal, Spacing.lg)
-                .padding(.top, Spacing.xl)
-                .padding(.bottom, 130)
             }
         }
         .onAppear {
             appState.refreshTodayLesson()
+            if carouselPositionID == nil {
+                carouselPositionID = carouselItems.first?.id
+            }
             withAnimation(.spring(response: 0.6, dampingFraction: 0.86).delay(0.05)) {
                 revealCards = true
             }
         }
+        .onChange(of: carouselItems.map(\.id)) { _, ids in
+            guard !ids.isEmpty else { return }
+            if let carouselPositionID, ids.contains(carouselPositionID) {
+                return
+            }
+            self.carouselPositionID = ids.first
+        }
         .sheet(isPresented: $showComposer) {
-            NewRouteComposerSheet(initialRequest: CourseGenerationRequest.suggested(from: appState.userProfile))
+            NewRouteComposerSheet()
                 .environmentObject(appState)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
         }
     }
 
     private var header: some View {
-        ViewThatFits(in: .vertical) {
-            HStack(alignment: .top, spacing: Spacing.md) {
-                headerCopy
-                createRouteButton
-            }
+        HStack(alignment: .top, spacing: 16) {
+            headerCopy
+            Spacer(minLength: 0)
 
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                headerCopy
-                createRouteButton
+            Button {
+                showComposer = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 15, weight: .bold))
+                    Text("Nueva ruta")
+                        .font(.custom("Nunito-Bold", size: 14))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(RoutePalette.coral)
+                .clipShape(Capsule())
             }
+            .buttonStyle(.plain)
         }
+        .padding(.horizontal, 20)
     }
 
-    private var headerCopy: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(LoopCopy.routesTitle(junior: isJuniorMode))
-                .font(LoopFont.black(28))
-                .foregroundColor(.textPrimary)
-            Text("Crea varias rutas con lenguaje, framework y un brief propio. El backend actual sigue sincronizando una ruta activa, pero la app ya guarda y muestra todas tus solicitudes.")
-                .font(LoopFont.regular(13))
-                .foregroundColor(.textSecond)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
+    private func carouselSection(cardWidth: CGFloat, horizontalInset: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Rutas activas")
+                .font(.custom("Nunito-Bold", size: 18))
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
 
-    private var createRouteButton: some View {
-        Button {
-            showComposer = true
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 14, weight: .bold))
-                Text("Nueva ruta")
-                    .font(LoopFont.bold(13))
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, Spacing.md)
-            .padding(.vertical, 10)
-            .background(
-                LinearGradient(
-                    colors: [Color.coral, Color.amethyst],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .clipShape(Capsule())
-            .shadow(color: Color.coral.opacity(0.28), radius: 12, y: 8)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var routeBuilderCard: some View {
-        LoopCard(accentColor: .periwinkle, showsSceneAccent: true, usesGlassSurface: true) {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                sectionHeader(
-                    title: "Diseña tu siguiente curso",
-                    subtitle: "Elige stack y describe el tipo de proyecto o skill que quieres practicar."
-                )
-
-                ViewThatFits(in: .vertical) {
-                    HStack(spacing: Spacing.sm) {
-                        ChipView(icon: "chevron.left.forwardslash.chevron.right", text: "Lenguaje a medida", tint: .periwinkle)
-                        ChipView(icon: "square.stack.3d.up.fill", text: "Framework opcional", tint: .mint)
-                    }
-
-                    VStack(alignment: .leading, spacing: Spacing.sm) {
-                        ChipView(icon: "chevron.left.forwardslash.chevron.right", text: "Lenguaje a medida", tint: .periwinkle)
-                        ChipView(icon: "square.stack.3d.up.fill", text: "Framework opcional", tint: .mint)
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 16) {
+                    ForEach(carouselItems) { item in
+                        Group {
+                            switch item.kind {
+                            case .add:
+                                AddRouteCard(action: { showComposer = true })
+                            case .focus, .created:
+                                RouteCarouselCard(
+                                    item: item,
+                                    availableLessons: availableLessons,
+                                    totalLessons: totalLessons
+                                )
+                            }
+                        }
+                        .frame(width: cardWidth)
+                        .id(item.id)
                     }
                 }
+                .scrollTargetLayout()
+                .padding(.horizontal, horizontalInset)
+            }
+            .scrollPosition(id: $carouselPositionID)
+            .scrollTargetBehavior(.viewAligned)
 
-                if let lastRoute = createdRoutes.first {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Ultima creada")
-                            .font(LoopFont.bold(12))
-                            .foregroundColor(.textPrimary)
-                        Text(lastRoute.request.summaryLine)
-                            .font(LoopFont.regular(13))
-                            .foregroundColor(.textSecond)
-                    }
+            HStack(spacing: 6) {
+                ForEach(Array(carouselItems.enumerated()), id: \.element.id) { index, item in
+                    Circle()
+                        .fill(currentCarouselIndex == index ? RoutePalette.coral : RoutePalette.periwinkle.opacity(0.3))
+                        .frame(width: currentCarouselIndex == index ? 8 : 6, height: currentCarouselIndex == index ? 8 : 6)
+                        .animation(.spring(duration: 0.2), value: currentCarouselIndex)
+                        .accessibilityHidden(item.kind == .add)
                 }
             }
+            .frame(maxWidth: .infinity)
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            showComposer = true
-        }
+        .opacity(revealCards ? 1 : 0)
+        .offset(y: revealCards ? 0 : 10)
     }
 
-    private func sectionHeader(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(LoopFont.bold(20))
-                .foregroundColor(.textPrimary)
-            Text(subtitle)
-                .font(LoopFont.regular(13))
-                .foregroundColor(.textSecond)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
+    private var routeSummary: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("En foco")
+                .font(.custom("Nunito-Bold", size: 18))
+                .foregroundColor(.white)
 
-    private var customRoutesSection: some View {
-        LoopCard(accentColor: .loopGold, showsSceneAccent: true, usesGlassSurface: true) {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                sectionHeader(
-                    title: "Rutas creadas",
-                    subtitle: "Estas solicitudes quedan guardadas aunque el backend actual solo exponga una ruta activa."
-                )
-
-                ForEach(createdRoutes) { route in
-                    customRouteRow(route)
-                }
-            }
-        }
-    }
-
-    private func customRouteRow(_ route: CustomRouteRecord) -> some View {
-        LoopCard(accentColor: badgeTint(for: route), usesGlassSurface: true) {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                HStack(alignment: .top, spacing: Spacing.md) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(route.title)
-                            .font(LoopFont.bold(15))
-                            .foregroundColor(.textPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(route.request.summaryLine)
-                            .font(LoopFont.regular(12))
-                            .foregroundColor(.textSecond)
-                    }
-
-                    Spacer(minLength: 0)
-
-                    routeBadge(for: route)
-                }
-
-                if !route.request.trimmedFocus.isEmpty {
-                    infoLine(title: "Enfoque", value: route.request.trimmedFocus)
-                }
-
-                if let backendCourseID = route.backendCourseID, !backendCourseID.isEmpty {
-                    infoLine(title: "Backend ID", value: backendCourseID)
-                }
-            }
-        }
-    }
-
-    private func routeRow(course: CourseStatusPayload) -> some View {
-        LoopCard(accentColor: .coral, usesGlassSurface: true) {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                HStack(alignment: .top, spacing: Spacing.md) {
-                    routeLeading(course: course)
-                    Spacer(minLength: 0)
-                    routeStatus
-                }
-
-                ViewThatFits(in: .vertical) {
-                    HStack(spacing: Spacing.sm) {
-                        ChipView(icon: "chevron.left.forwardslash.chevron.right", text: course.language, tint: .periwinkle)
-                        ChipView(icon: "checkmark.circle.fill", text: courseProgressLabel, tint: .mint)
-                    }
-
-                    VStack(alignment: .leading, spacing: Spacing.sm) {
-                        ChipView(icon: "chevron.left.forwardslash.chevron.right", text: course.language, tint: .periwinkle)
-                        ChipView(icon: "checkmark.circle.fill", text: courseProgressLabel, tint: .mint)
-                    }
-                }
-
-                LoopProgressBar(progress: courseProgress, height: 10)
-
-                if let lesson = appState.todayLesson {
-                    Text("Siguiente acceso: \(lesson.title) · \(lesson.estimatedMinutes) min")
-                        .font(LoopFont.regular(12))
-                        .foregroundColor(.textSecond)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
-
-    private func routeLeading(course: CourseStatusPayload) -> some View {
-        HStack(alignment: .center, spacing: Spacing.md) {
-            Circle()
-                .fill(Color.coral.opacity(0.22))
-                .frame(width: 42, height: 42)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(RoutePalette.card)
                 .overlay(
-                    Image(systemName: appState.isGeneratingCourse ? "sparkles" : "play.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.white)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(RoutePalette.periwinkle.opacity(0.12), lineWidth: 1)
                 )
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(course.resolvedTitle)
-                        .font(LoopFont.bold(14))
-                        .foregroundColor(.textPrimary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(appState.isGeneratingCourse
-                         ? "Generando"
-                         : LoopCopy.focusLabel(junior: isJuniorMode))
-                        .font(LoopFont.bold(10))
-                        .foregroundColor(appState.isGeneratingCourse ? .loopGold : .coral)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background((appState.isGeneratingCourse ? Color.loopGold : Color.coral).opacity(0.16))
-                        .clipShape(Capsule())
+                .overlay(alignment: .topTrailing) {
+                    if appState.isGeneratingCourse {
+                        statusBadge(label: "Generando", tint: RoutePalette.amethyst, icon: "sparkles")
+                            .padding(16)
+                    }
                 }
+                .overlay {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text(currentCourse?.resolvedTitle ?? "Todavia no hay ruta activa")
+                            .font(.custom("Nunito-Bold", size: 18))
+                            .foregroundColor(.white)
 
-                Text(course.resolvedSummary)
-                    .font(LoopFont.regular(12))
-                    .foregroundColor(.textSecond)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+                        Text(currentCourse?.resolvedSummary ?? "Crea una nueva ruta desde el carousel para empezar a poblar tu mapa.")
+                            .font(.custom("Nunito-Regular", size: 14))
+                            .foregroundColor(RoutePalette.periwinkle.opacity(0.78))
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if currentCourse != nil {
+                            HStack(spacing: 12) {
+                                miniMetric(title: "Progreso", value: "\(Int(routeProgress * 100))%")
+                                miniMetric(title: "Modulo", value: currentModuleLabel)
+                                miniMetric(title: "Disponibles", value: "\(availableLessons)/\(max(totalLessons, 1))")
+                            }
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(minHeight: 156)
         }
-        .layoutPriority(1)
+        .padding(.horizontal, 20)
+        .opacity(revealCards ? 1 : 0)
+        .offset(y: revealCards ? 0 : 10)
     }
 
-    private var routeStatus: some View {
-        VStack(alignment: .trailing, spacing: 6) {
-            Text("\(Int(courseProgress * 100))%")
-                .font(LoopFont.bold(16))
-                .foregroundColor(.coral)
-
-            Text("Disponibles \(availableLessons)/\(totalLessons)")
-                .font(LoopFont.regular(11))
-                .foregroundColor(.textSecond)
-        }
-        .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private func routeBadge(for route: CustomRouteRecord) -> some View {
-        let descriptor = routeBadgeDescriptor(for: route)
-
-        return HStack(spacing: 6) {
-            Image(systemName: descriptor.icon)
-                .font(.system(size: 10, weight: .bold))
-            Text(descriptor.label)
-                .font(LoopFont.bold(11))
-        }
-        .foregroundColor(descriptor.tint)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(descriptor.tint.opacity(0.16))
-        .clipShape(Capsule())
-    }
-
-    private func badgeTint(for route: CustomRouteRecord) -> Color {
-        routeBadgeDescriptor(for: route).tint
-    }
-
-    private func routeBadgeDescriptor(for route: CustomRouteRecord) -> (label: String, tint: Color, icon: String) {
-        switch route.status {
-        case .requesting:
-            return ("Enviando", .amethyst, "paperplane.fill")
-        case .queued:
-            return ("En cola", .loopGold, "clock.fill")
-        case .active:
-            return ("Activa", .mint, "checkmark.circle.fill")
-        case .failed:
-            return ("Error", .coral, "exclamationmark.triangle.fill")
-        }
-    }
-
-    private func infoLine(title: String, value: String) -> some View {
+    private func miniMetric(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title.uppercased())
-                .font(LoopFont.bold(11))
-                .foregroundColor(.loopGold)
+                .font(.custom("Nunito-Bold", size: 11))
+                .foregroundColor(RoutePalette.periwinkle.opacity(0.7))
             Text(value)
-                .font(LoopFont.regular(13))
-                .foregroundColor(.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
+                .font(.custom("Nunito-Bold", size: 15))
+                .foregroundColor(.white)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func progress(for route: CustomRouteRecord) -> Double? {
+        switch route.status {
+        case .generating:
+            return nil
+        case .queued:
+            return 0.08
+        case .active:
+            if route.backendCourseID == currentCourse?.id {
+                return routeProgress
+            }
+            return 0.16
+        case .failed:
+            return 0
         }
     }
 
-    private var emptyState: some View {
-        VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text(appState.isGeneratingCourse ? "Tu curso se esta generando" : "Todavia no hay rutas activas")
-                .font(LoopFont.bold(16))
-                .foregroundColor(.textPrimary)
-            Text(appState.courseSyncErrorMessage ?? "En cuanto el backend publique tu curso, aparecera aqui con progreso real y acceso directo.")
-                .font(LoopFont.regular(13))
-                .foregroundColor(.textSecond)
-                .fixedSize(horizontal: false, vertical: true)
+    private func moduleLabel(for route: CustomRouteRecord) -> String {
+        switch route.status {
+        case .generating:
+            return "Sincronizando roadmap"
+        case .queued:
+            return "En cola para activarse"
+        case .active:
+            if route.backendCourseID == currentCourse?.id {
+                return currentModuleLabel
+            }
+            return "Lista para empezar"
+        case .failed:
+            return "Necesita reintento"
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, Spacing.sm)
+    }
+
+    private func difficultyStars(from rawDifficulty: String?) -> Int {
+        let normalized = rawDifficulty?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        switch normalized {
+        case "advanced", "hard", "alto", "avanzado":
+            return 3
+        case "intermediate", "medium", "medio", "intermedio":
+            return 2
+        default:
+            return 1
+        }
+    }
+
+    private func statusBadge(label: String, tint: Color, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .bold))
+            Text(label)
+                .font(.custom("Nunito-Bold", size: 11))
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(tint.opacity(0.24))
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .clipShape(Capsule())
     }
 }
 
 private struct NewRouteComposerSheet: View {
+    private enum Phase: Equatable {
+        case form
+        case generating
+        case success(routeID: String)
+    }
+
+    private enum ComposerField: Hashable {
+        case focus
+        case prompt
+    }
+
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appState: AppState
 
-    @State private var request: CourseGenerationRequest
-    @State private var isSubmitting = false
+    @FocusState private var focusedField: ComposerField?
 
-    init(initialRequest: CourseGenerationRequest) {
-        _request = State(initialValue: initialRequest.normalized())
-    }
+    @State private var selectedLanguage: ProgrammingLanguage?
+    @State private var selectedFramework: CourseFramework = .none
+    @State private var focusText = ""
+    @State private var promptText = ""
+    @State private var selectedLevel: CourseSkillLevel?
+    @State private var phase: Phase = .form
 
-    private var normalizedRequest: CourseGenerationRequest {
-        request.normalized()
+    private let supportedLanguages: [ProgrammingLanguage] = [.python, .javascript, .typescript, .swift, .kotlin, .rust, .go]
+
+    private var isGenerating: Bool {
+        switch phase {
+        case .form:
+            return false
+        case .generating, .success:
+            return true
+        }
     }
 
     private var availableFrameworks: [CourseFramework] {
-        CourseFramework.options(for: request.language)
+        guard let selectedLanguage else { return [] }
+
+        switch selectedLanguage {
+        case .python:
+            return [.none, .django, .flask, .fastAPI]
+        case .javascript:
+            return [.none, .react, .vue, .node, .nextJS]
+        case .typescript:
+            return [.none, .react, .angular, .nestJS]
+        case .swift:
+            return [.none, .swiftUI, .uiKit, .vapor]
+        case .kotlin:
+            return [.none, .android, .ktor, .spring]
+        case .rust:
+            return [.none, .actix, .tokio]
+        case .go:
+            return [.none, .gin, .echo, .fiber]
+        case .html:
+            return [.none]
+        }
     }
 
     private var canSubmit: Bool {
-        normalizedRequest.isValid && !isSubmitting
+        selectedLanguage != nil && !isGenerating
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                AmbientBackground(topColor: .coral, bottomColor: .amethyst)
+        ZStack {
+            Color.loopBG
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                handlePill
+                header
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: Spacing.lg) {
-                        LoopCard(accentColor: .coral, showsSceneAccent: true, usesGlassSurface: true) {
-                            VStack(alignment: .leading, spacing: Spacing.md) {
-                                Text("Nueva ruta")
-                                    .font(LoopFont.black(26))
-                                    .foregroundColor(.textPrimary)
-                                Text("Describe el curso que quieres y el enfoque que te importa. Puedes crear varias solicitudes; mientras tanto el backend actual sigue activando una ruta a la vez.")
-                                    .font(LoopFont.regular(14))
-                                    .foregroundColor(.textSecond)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
+                    VStack(spacing: 16) {
+                        languageSection
+                        frameworkSection
+                        focusSection
+                        promptSection
+                        levelSection
 
-                        optionSection(
-                            title: "Lenguaje",
-                            subtitle: "Elige la base principal del curso."
-                        ) {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 10) {
-                                    ForEach(ProgrammingLanguage.allCases) { language in
-                                        SelectionPill(
-                                            title: language.rawValue,
-                                            icon: "chevron.left.forwardslash.chevron.right",
-                                            isSelected: request.language == language,
-                                            tint: .periwinkle
-                                        ) {
-                                            request.language = language
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        optionSection(
-                            title: "Framework",
-                            subtitle: "Opcional. Filtramos solo frameworks compatibles con el lenguaje elegido."
-                        ) {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 10) {
-                                    ForEach(availableFrameworks) { framework in
-                                        SelectionPill(
-                                            title: framework.rawValue,
-                                            icon: framework.iconName,
-                                            isSelected: request.framework == framework,
-                                            tint: .mint
-                                        ) {
-                                            request.framework = framework
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        PromptEditorCard(
-                            title: "Que curso quieres",
-                            subtitle: "Ejemplo: quiero un curso para crear una app de gastos con React y autenticacion.",
-                            text: $request.prompt
-                        )
-
-                        PromptEditorCard(
-                            title: "Enfocado a",
-                            subtitle: "Ejemplo: enfocado a portfolio, entrevistas tecnicas o lanzar un MVP real.",
-                            text: $request.focus
-                        )
-
-                        if let errorMessage = appState.courseSyncErrorMessage, !errorMessage.isEmpty {
-                            LoopCard(accentColor: .coral, usesGlassSurface: true) {
+                        if let errorMessage = appState.courseSyncErrorMessage, !errorMessage.isEmpty, phase == .form {
+                            composerCard {
                                 Text(errorMessage)
-                                    .font(LoopFont.regular(13))
-                                    .foregroundColor(.textPrimary)
+                                    .font(.custom("Nunito-Regular", size: 14))
+                                    .foregroundColor(.white)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 24)
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .disabled(isGenerating)
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            bottomBar
+        }
+        .interactiveDismissDisabled(isGenerating)
+        .onChange(of: selectedLanguage) { _, newValue in
+            guard let newValue else {
+                selectedFramework = .none
+                return
+            }
 
-                        LoopCTA(
-                            title: isSubmitting ? "Creando ruta..." : "Crear ruta",
-                            trailingIcon: isSubmitting ? nil : "sparkles",
-                            isDisabled: !canSubmit,
-                            style: .solid(.coral)
-                        ) {
-                            submit()
+            if !availableFrameworks.contains(selectedFramework) {
+                selectedFramework = .none
+            }
+
+            if newValue == .html {
+                selectedLanguage = nil
+            }
+        }
+    }
+
+    private var handlePill: some View {
+        Capsule()
+            .fill(RoutePalette.periwinkle.opacity(0.25))
+            .frame(width: 42, height: 5)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
+    }
+
+    private var header: some View {
+        HStack {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .foregroundColor(RoutePalette.periwinkle)
+                    .frame(width: 36, height: 36)
+                    .background(RoutePalette.card)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isGenerating)
+
+            Spacer()
+
+            Text("Nueva ruta")
+                .font(.custom("Nunito-Bold", size: 20))
+                .foregroundColor(.white)
+
+            Spacer()
+
+            Color.clear
+                .frame(width: 36, height: 36)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
+    }
+
+    private var languageSection: some View {
+        composerCard {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionLabel(
+                    title: "Lenguaje",
+                    icon: "chevron.left.forwardslash.chevron.right",
+                    tint: RoutePalette.coral
+                )
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(supportedLanguages) { language in
+                            SelectionChip(
+                                title: language.rawValue,
+                                icon: language.symbolName,
+                                isSelected: selectedLanguage == language,
+                                primaryTint: RoutePalette.coral,
+                                secondaryTint: RoutePalette.celadon
+                            ) {
+                                selectedLanguage = language
+                            }
                         }
                     }
-                    .padding(.horizontal, Spacing.lg)
-                    .padding(.top, Spacing.lg)
-                    .padding(.bottom, Spacing.xl)
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cerrar") {
-                        dismiss()
+        }
+    }
+
+    private var frameworkSection: some View {
+        composerCard {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionLabel(
+                    title: "Framework",
+                    icon: "square.stack.3d.up.fill",
+                    tint: RoutePalette.celadon
+                )
+
+                if selectedLanguage == nil {
+                    Text("Elige un lenguaje primero")
+                        .font(.custom("Nunito-Regular", size: 13))
+                        .foregroundColor(RoutePalette.periwinkle.opacity(0.72))
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(availableFrameworks) { framework in
+                                SelectionChip(
+                                    title: framework.rawValue,
+                                    icon: framework.iconName,
+                                    isSelected: selectedFramework == framework,
+                                    primaryTint: RoutePalette.celadon,
+                                    secondaryTint: RoutePalette.coral
+                                ) {
+                                    selectedFramework = framework
+                                }
+                            }
+                        }
                     }
                 }
             }
-            .onChange(of: request.language) { _, _ in
-                if !availableFrameworks.contains(request.framework) {
-                    request.framework = .none
+            .opacity(selectedLanguage == nil ? 0.4 : 1)
+        }
+    }
+
+    private var focusSection: some View {
+        composerCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    sectionLabel(
+                        title: "Enfoque del curso",
+                        icon: "sparkles",
+                        tint: RoutePalette.amethyst
+                    )
+
+                    Spacer()
+
+                    Text("Opcional")
+                        .font(.custom("Nunito-Regular", size: 11))
+                        .foregroundColor(RoutePalette.periwinkle)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(RoutePalette.prussian)
+                        .clipShape(Capsule())
+                }
+
+                Text("Describe qué quieres construir o aprender.")
+                    .font(.custom("Nunito-Regular", size: 13))
+                    .foregroundColor(RoutePalette.periwinkle.opacity(0.7))
+
+                TextField("Ej: una app de gastos con autenticación", text: $focusText, axis: .vertical)
+                    .lineLimit(3...5)
+                    .font(.custom("Nunito-Regular", size: 15))
+                    .foregroundColor(.white)
+                    .padding(14)
+                    .background(RoutePalette.prussian)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(
+                                focusedField == .focus ? RoutePalette.coral.opacity(0.6) : RoutePalette.periwinkle.opacity(0.15),
+                                lineWidth: focusedField == .focus ? 2 : 1
+                            )
+                    )
+                    .focused($focusedField, equals: .focus)
+            }
+        }
+    }
+
+    private var promptSection: some View {
+        composerCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    sectionLabel(
+                        title: "Descripción libre",
+                        icon: "text.alignleft",
+                        tint: RoutePalette.coral
+                    )
+                    Spacer()
+                    Text("Opcional")
+                        .font(.custom("Nunito-Regular", size: 11))
+                        .foregroundColor(RoutePalette.periwinkle)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(RoutePalette.prussian)
+                        .clipShape(Capsule())
+                }
+
+                Text("Cuéntanos en tus propias palabras qué quieres aprender, qué proyecto tienes en mente o cualquier detalle extra.")
+                    .font(.custom("Nunito-Regular", size: 13))
+                    .foregroundColor(RoutePalette.periwinkle.opacity(0.7))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                ZStack(alignment: .topLeading) {
+                    if promptText.isEmpty {
+                        Text("Ej: Quiero crear una API REST con autenticación JWT, conexión a Postgres y tests automáticos.")
+                            .font(.custom("Nunito-Regular", size: 14))
+                            .foregroundColor(RoutePalette.periwinkle.opacity(0.35))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .allowsHitTesting(false)
+                    }
+
+                    TextEditor(text: $promptText)
+                        .font(.custom("Nunito-Regular", size: 15))
+                        .foregroundColor(.white)
+                        .scrollContentBackground(.hidden)
+                        .focused($focusedField, equals: .prompt)
+                        .frame(minHeight: 96)
+                }
+                .padding(10)
+                .background(RoutePalette.prussian)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(
+                            focusedField == .prompt ? RoutePalette.coral.opacity(0.6) : RoutePalette.periwinkle.opacity(0.15),
+                            lineWidth: focusedField == .prompt ? 2 : 1
+                        )
+                )
+            }
+        }
+    }
+
+    private var levelSection: some View {
+        composerCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    sectionLabel(
+                        title: "Nivel",
+                        icon: "chart.line.uptrend.xyaxis",
+                        tint: RoutePalette.cerulean
+                    )
+                    Spacer()
+                    Text("Opcional")
+                        .font(.custom("Nunito-Regular", size: 11))
+                        .foregroundColor(RoutePalette.periwinkle)
+                }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(CourseSkillLevel.allCases) { level in
+                            SelectionChip(
+                                title: level.rawValue,
+                                icon: "star.fill",
+                                isSelected: selectedLevel == level,
+                                primaryTint: RoutePalette.cerulean,
+                                secondaryTint: RoutePalette.celadon
+                            ) {
+                                selectedLevel = selectedLevel == level ? nil : level
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
-    private func optionSection<Content: View>(
-        title: String,
-        subtitle: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        let sectionContent = content()
+    private var bottomBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .overlay(RoutePalette.periwinkle.opacity(0.08))
 
-        return LoopCard(accentColor: .clear, usesGlassSurface: true) {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(LoopFont.bold(18))
-                        .foregroundColor(.textPrimary)
-                    Text(subtitle)
-                        .font(LoopFont.regular(13))
-                        .foregroundColor(.textSecond)
-                        .fixedSize(horizontal: false, vertical: true)
+            switch phase {
+            case .form:
+                VStack(spacing: 12) {
+                    if let selectedLanguage {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(RoutePalette.celadon)
+
+                            Text(summaryLine(for: selectedLanguage))
+                                .font(.custom("Nunito-SemiBold", size: 14))
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                    }
+
+                    Button {
+                        generateCourse()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                            Text("Generar curso")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(LoopCTAButton(tint: RoutePalette.coral))
+                    .disabled(!canSubmit)
+                    .opacity(canSubmit ? 1 : 0.5)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
                 }
 
-                sectionContent
+            case .generating:
+                generationStateCard(
+                    expression: .thinking,
+                    title: "Creando tu curso con IA...",
+                    subtitle: "Esto toma unos segundos"
+                )
+
+            case .success:
+                successStateCard
             }
+        }
+        .background(RoutePalette.prussian)
+        .ignoresSafeArea(.keyboard)
+    }
+
+    private var successStateCard: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(RoutePalette.celadon.opacity(0.18))
+                    .frame(width: 84, height: 84)
+
+                LoopyExpressionView(expression: .happy, size: 60)
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(RoutePalette.celadon)
+                Text("Listo")
+                    .font(.custom("Nunito-Bold", size: 18))
+                    .foregroundColor(.white)
+            }
+
+            Text("Tu nueva ruta ya se agregó al roadmap.")
+                .font(.custom("Nunito-Regular", size: 14))
+                .foregroundColor(RoutePalette.periwinkle)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(24)
+    }
+
+    private func generationStateCard(expression: LoopyExpression, title: String, subtitle: String) -> some View {
+        VStack(spacing: 16) {
+            LoopyExpressionView(expression: expression, size: 60)
+
+            Text(title)
+                .font(.custom("Nunito-Bold", size: 18))
+                .foregroundColor(.white)
+
+            Text(subtitle)
+                .font(.custom("Nunito-Regular", size: 14))
+                .foregroundColor(RoutePalette.periwinkle)
+
+            ProgressView()
+                .progressViewStyle(.linear)
+                .tint(RoutePalette.coral)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(24)
+    }
+
+    private func summaryLine(for language: ProgrammingLanguage) -> String {
+        if selectedFramework == .none {
+            return "Curso de \(language.rawValue)"
+        }
+        return "Curso de \(language.rawValue) · \(selectedFramework.rawValue)"
+    }
+
+    private func sectionLabel(title: String, icon: String, tint: Color) -> some View {
+        Label {
+            Text(title)
+                .font(.custom("Nunito-Bold", size: 16))
+                .foregroundColor(.white)
+        } icon: {
+            Image(systemName: icon)
+                .foregroundColor(tint)
         }
     }
 
-    private func submit() {
-        guard canSubmit else { return }
-        isSubmitting = true
+    private func composerCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            content()
+        }
+        .padding(16)
+        .background(RoutePalette.card)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func generateCourse() {
+        guard let selectedLanguage else { return }
+
+        let request = CourseGenerationRequest(
+            language: selectedLanguage,
+            framework: selectedFramework,
+            prompt: promptText.trimmingCharacters(in: .whitespacesAndNewlines),
+            focus: focusText.trimmingCharacters(in: .whitespacesAndNewlines),
+            level: selectedLevel
+        )
+
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.86)) {
+            phase = .generating
+        }
 
         Task {
-            let didCreate = await appState.createCustomCourse(request: normalizedRequest)
+            let createdRouteID = await appState.createCustomCourse(request: request)
 
             await MainActor.run {
-                isSubmitting = false
-                if didCreate {
+                guard let createdRouteID else {
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+                        phase = .form
+                    }
+                    return
+                }
+
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) {
+                    phase = .success(routeID: createdRouteID)
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                     dismiss()
+
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        appState.selectedMainTab = .map
+                        appState.mapFocusedRouteID = createdRouteID
+                        LoopToast.routeReady()
+                    }
                 }
             }
         }
     }
 }
 
-private struct PromptEditorCard: View {
-    let title: String
-    let subtitle: String
-    @Binding var text: String
+private struct RouteCarouselCard: View {
+    let item: RouteCarouselItem
+    let availableLessons: Int
+    let totalLessons: Int
 
     var body: some View {
-        LoopCard(accentColor: .clear, usesGlassSurface: true) {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(LoopFont.bold(18))
-                        .foregroundColor(.textPrimary)
-                    Text(subtitle)
-                        .font(LoopFont.regular(13))
-                        .foregroundColor(.textSecond)
-                        .fixedSize(horizontal: false, vertical: true)
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(gradient)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        titleBlock
+                        technologyPills
+                    }
+
+                    Spacer(minLength: 0)
+
+                    badge
                 }
 
-                TextEditor(text: $text)
-                    .frame(minHeight: 120)
-                    .padding(12)
-                    .background(
-                        RoundedRectangle(cornerRadius: Radius.md)
-                            .fill(Color.loopSurf2.opacity(0.84))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radius.md)
-                            .stroke(Color.borderSoft, lineWidth: 1)
-                    )
-                    .font(LoopFont.regular(14))
-                    .foregroundColor(.textPrimary)
+                Spacer(minLength: 0)
+
+                HStack(alignment: .bottom, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        moduleInfo
+                        difficultyInfo
+                    }
+
+                    Spacer(minLength: 0)
+
+                    progressBlock
+                }
             }
+            .padding(22)
+        }
+        .frame(minHeight: 250)
+        .shadow(color: accentColor.opacity(0.18), radius: 18, y: 12)
+    }
+
+    private var accentColor: Color {
+        switch item.status {
+        case .focus:
+            return RoutePalette.celadon
+        case .generating:
+            return RoutePalette.amethyst
+        case .queued:
+            return RoutePalette.gold
+        case .active:
+            return RoutePalette.celadon
+        case .failed:
+            return RoutePalette.coral
+        }
+    }
+
+    private var gradient: LinearGradient {
+        let leading: Color
+
+        switch item.language {
+        case .python:
+            leading = RoutePalette.cerulean
+        case .javascript:
+            leading = RoutePalette.gold.opacity(0.92)
+        case .swift:
+            leading = RoutePalette.coral
+        case .typescript:
+            leading = RoutePalette.amethyst
+        default:
+            leading = RoutePalette.card
+        }
+
+        return LinearGradient(
+            colors: [leading.opacity(0.92), RoutePalette.prussian],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    @ViewBuilder
+    private var titleBlock: some View {
+        if item.showsSkeleton {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("")
+                    .skeleton(with: true)
+                    .shape(type: .rounded(.radius(6)))
+                    .frame(width: 180, height: 22)
+
+                Text("")
+                    .skeleton(with: true)
+                    .shape(type: .rounded(.radius(6)))
+                    .frame(width: 120, height: 14)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(item.title)
+                    .font(.custom("Nunito-Bold", size: 24))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+
+                Text(item.subtitle)
+                    .font(.custom("Nunito-Regular", size: 14))
+                    .foregroundColor(RoutePalette.periwinkle.opacity(0.88))
+                    .lineLimit(3)
+            }
+        }
+    }
+
+    private var technologyPills: some View {
+        HStack(spacing: 8) {
+            if let language = item.language {
+                pill(text: language.rawValue, icon: language.symbolName)
+            }
+
+            if let frameworkName = item.frameworkName, !frameworkName.isEmpty {
+                pill(text: frameworkName, icon: "square.stack.3d.up.fill")
+            }
+        }
+    }
+
+    private func pill(text: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .bold))
+            Text(text)
+                .font(.custom("Nunito-SemiBold", size: 12))
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.white.opacity(0.12))
+        .clipShape(Capsule())
+    }
+
+    private var badge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: badgeDescriptor.icon)
+                .font(.system(size: 10, weight: .bold))
+            Text(badgeDescriptor.title)
+                .font(.custom("Nunito-Bold", size: 11))
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(badgeDescriptor.tint.opacity(0.22))
+        .clipShape(Capsule())
+    }
+
+    private var badgeDescriptor: (title: String, tint: Color, icon: String) {
+        switch item.status {
+        case .focus:
+            return ("En foco", RoutePalette.celadon, "scope")
+        case .generating:
+            return ("Generando", RoutePalette.amethyst, "sparkles")
+        case .queued:
+            return ("En cola", RoutePalette.gold, "clock.fill")
+        case .active:
+            return ("Activa", RoutePalette.celadon, "checkmark.circle.fill")
+        case .failed:
+            return ("Error", RoutePalette.coral, "exclamationmark.triangle.fill")
+        }
+    }
+
+    @ViewBuilder
+    private var moduleInfo: some View {
+        if item.showsSkeleton {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("")
+                    .skeleton(with: true)
+                    .shape(type: .rounded(.radius(5)))
+                    .frame(width: 88, height: 12)
+                Text("")
+                    .skeleton(with: true)
+                    .shape(type: .rounded(.radius(5)))
+                    .frame(width: 132, height: 16)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Modulo actual")
+                    .font(.custom("Nunito-Regular", size: 12))
+                    .foregroundColor(RoutePalette.periwinkle.opacity(0.76))
+
+                Text(item.moduleLabel)
+                    .font(.custom("Nunito-Bold", size: 16))
+                    .foregroundColor(.white)
+            }
+        }
+    }
+
+    private var difficultyInfo: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<3, id: \.self) { index in
+                Image(systemName: index < item.difficultyStars ? "star.fill" : "star")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(index < item.difficultyStars ? RoutePalette.gold : RoutePalette.periwinkle.opacity(0.36))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var progressBlock: some View {
+        if item.showsSkeleton {
+            VStack(spacing: 10) {
+                ProgressView()
+                    .tint(.white)
+                Text("Generando...")
+                    .font(.custom("Nunito-SemiBold", size: 12))
+                    .foregroundColor(RoutePalette.periwinkle.opacity(0.8))
+            }
+        } else if let progress = item.progress {
+            RouteProgressRing(progress: progress, tint: accentColor)
         }
     }
 }
 
-private struct SelectionPill: View {
+private struct AddRouteCard: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(RoutePalette.card)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(
+                                RoutePalette.periwinkle.opacity(0.3),
+                                style: StrokeStyle(lineWidth: 1, dash: [8, 8])
+                            )
+                    )
+
+                VStack(spacing: 14) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundColor(RoutePalette.coral)
+
+                    Text("Nueva ruta")
+                        .font(.custom("Nunito-Bold", size: 20))
+                        .foregroundColor(RoutePalette.periwinkle)
+
+                    Text("Genera otro curso sin perder los que ya tienes en cola.")
+                        .font(.custom("Nunito-Regular", size: 14))
+                        .foregroundColor(RoutePalette.periwinkle.opacity(0.72))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(24)
+            }
+            .frame(minHeight: 250)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct RouteProgressRing: View {
+    let progress: Double
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.white.opacity(0.12), lineWidth: 8)
+                .frame(width: 76, height: 76)
+
+            Circle()
+                .trim(from: 0, to: max(min(progress, 1), 0))
+                .stroke(
+                    tint,
+                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+                .frame(width: 76, height: 76)
+
+            Text("\(Int(progress * 100))%")
+                .font(.custom("Nunito-Bold", size: 15))
+                .foregroundColor(.white)
+        }
+    }
+}
+
+private struct SelectionChip: View {
     let title: String
     let icon: String
     let isSelected: Bool
-    let tint: Color
+    let primaryTint: Color
+    let secondaryTint: Color
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                 Text(title)
-                    .font(LoopFont.bold(12))
-                    .lineLimit(1)
+                    .font(.custom("Nunito-SemiBold", size: 14))
             }
-            .foregroundColor(isSelected ? .white : .textPrimary)
-            .padding(.horizontal, 12)
+            .foregroundColor(.white)
+            .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(
-                Capsule()
-                    .fill(isSelected ? tint : Color.loopSurf2.opacity(0.84))
-            )
+            .background(backgroundStyle)
             .overlay(
                 Capsule()
-                    .stroke(isSelected ? tint.opacity(0.2) : Color.borderSoft, lineWidth: 1)
+                    .strokeBorder(borderColor, lineWidth: isSelected ? 0 : 1)
             )
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+
+    private var backgroundStyle: some ShapeStyle {
+        if isSelected {
+            return AnyShapeStyle(
+                LinearGradient(
+                    colors: [primaryTint, secondaryTint],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+        }
+
+        return AnyShapeStyle(RoutePalette.prussian)
+    }
+
+    private var borderColor: Color {
+        RoutePalette.periwinkle.opacity(0.14)
+    }
+}
+
+private struct RouteCarouselItem: Identifiable, Equatable {
+    enum Kind: Equatable {
+        case focus
+        case created
+        case add
+    }
+
+    enum Status: Equatable {
+        case focus
+        case generating
+        case queued
+        case active
+        case failed
+    }
+
+    static let addCard = RouteCarouselItem(
+        id: "add-route",
+        kind: .add,
+        title: "",
+        subtitle: "",
+        language: nil,
+        frameworkName: nil,
+        status: .active,
+        progress: nil,
+        moduleLabel: "",
+        difficultyStars: 1,
+        showsSkeleton: false
+    )
+
+    let id: String
+    let kind: Kind
+    let title: String
+    let subtitle: String
+    let language: ProgrammingLanguage?
+    let frameworkName: String?
+    let status: Status
+    let progress: Double?
+    let moduleLabel: String
+    let difficultyStars: Int
+    let showsSkeleton: Bool
+}
+
+private enum RoutePalette {
+    static let prussian = Color.loopBG
+    static let coral = Color.coral
+    static let celadon = Color.mint
+    static let periwinkle = Color.periwinkle
+    static let cerulean = Color.cerulean
+    static let amethyst = Color.amethyst
+    static let gold = Color.loopGold
+    static let card = Color.loopSurf2
+}
+
+private extension ProgrammingLanguage {
+    var symbolName: String {
+        switch self {
+        case .python, .javascript, .typescript:
+            return "chevron.left.forwardslash.chevron.right"
+        case .swift:
+            return "swift"
+        case .kotlin:
+            return "k.square"
+        case .rust:
+            return "gear"
+        case .go:
+            return "g.square"
+        case .html:
+            return "curlybraces"
+        }
+    }
+}
+
+private extension CustomRouteStatus {
+    var displayStatus: RouteCarouselItem.Status {
+        switch self {
+        case .generating:
+            return .generating
+        case .queued:
+            return .queued
+        case .active:
+            return .active
+        case .failed:
+            return .failed
+        }
     }
 }

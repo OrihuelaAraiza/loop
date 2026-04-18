@@ -27,6 +27,8 @@ final class AppState: ObservableObject {
     @Published var isLoadingTodayLesson = false
     @Published var courseSyncErrorMessage: String?
     @Published var lastLessonCompletion: LessonCompletionSummary?
+    @Published var selectedMainTab: MainTab = .home
+    @Published var mapFocusedRouteID: String?
     @Published private(set) var lessonProgressByID: [String: LessonResumeState] = [:]
     @Published private(set) var customRoutes: [CustomRouteRecord] = []
 
@@ -174,20 +176,20 @@ final class AppState: ObservableObject {
     }
 
     @MainActor
-    func createCustomCourse(request: CourseGenerationRequest) async -> Bool {
+    func createCustomCourse(request: CourseGenerationRequest) async -> String? {
         guard let token = authSession?.apiToken else {
             courseSyncErrorMessage = "Necesitas iniciar sesion para crear una nueva ruta."
-            return false
+            return nil
         }
 
         let normalizedRequest = request.normalized()
-        guard normalizedRequest.isValid else {
-            courseSyncErrorMessage = "Describe el curso o el enfoque antes de generarlo."
-            return false
+        guard normalizedRequest.language != .html else {
+            courseSyncErrorMessage = "HTML solo no alcanza para esta ruta. Elige un lenguaje principal."
+            return nil
         }
 
         let record = CustomRouteRecord.draft(from: normalizedRequest)
-        customRoutes.insert(record, at: 0)
+        customRoutes.append(record)
         persistCustomRoutes()
         courseSyncErrorMessage = nil
         todayLesson = nil
@@ -222,14 +224,14 @@ final class AppState: ObservableObject {
 
             await ensureCourseAndLessonLoaded()
             reconcileCustomRoutes(with: currentCourse)
-            return true
+            return record.id
         } catch {
             updateCustomRoute(recordID: record.id) { route in
                 route.status = .failed
             }
             courseSyncErrorMessage = "No pudimos crear la nueva ruta. Intentalo de nuevo."
             isGeneratingCourse = false
-            return false
+            return nil
         }
     }
 
@@ -418,7 +420,6 @@ final class AppState: ObservableObject {
         guard let index = customRoutes.firstIndex(where: { $0.id == recordID }) else { return }
         mutate(&customRoutes[index])
         customRoutes[index].updatedAt = Date()
-        customRoutes.sort { $0.updatedAt > $1.updatedAt }
         persistCustomRoutes()
     }
 
@@ -433,7 +434,7 @@ final class AppState: ObservableObject {
 
             if let activeCourseID, customRoutes[index].backendCourseID == activeCourseID {
                 nextStatus = .active
-            } else if customRoutes[index].status == .active || customRoutes[index].status == .requesting {
+            } else if customRoutes[index].status == .active || customRoutes[index].status == .generating {
                 nextStatus = .queued
             } else {
                 continue
@@ -447,7 +448,6 @@ final class AppState: ObservableObject {
         }
 
         guard didChange else { return }
-        customRoutes.sort { $0.updatedAt > $1.updatedAt }
         persistCustomRoutes()
     }
 

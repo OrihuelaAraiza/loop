@@ -4,17 +4,26 @@ enum CourseFramework: String, Codable, CaseIterable, Identifiable {
     case none = "Sin framework"
     case swiftUI = "SwiftUI"
     case uiKit = "UIKit"
+    case vapor = "Vapor"
     case react = "React"
     case nextJS = "Next.js"
     case vue = "Vue"
+    case angular = "Angular"
+    case nestJS = "NestJS"
     case express = "Express"
     case node = "Node.js"
     case django = "Django"
     case flask = "Flask"
     case fastAPI = "FastAPI"
+    case android = "Android"
     case jetpackCompose = "Jetpack Compose"
     case ktor = "Ktor"
+    case spring = "Spring"
+    case actix = "Actix"
+    case tokio = "Tokio"
     case gin = "Gin"
+    case echo = "Echo"
+    case fiber = "Fiber"
 
     var id: String { rawValue }
 
@@ -22,17 +31,19 @@ enum CourseFramework: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .none:
             return "square.stack.3d.up"
-        case .swiftUI, .uiKit:
+        case .swiftUI, .uiKit, .vapor:
             return "iphone"
-        case .react, .nextJS, .vue:
+        case .react, .nextJS, .vue, .angular, .nestJS:
             return "sparkles.rectangle.stack"
         case .express, .node:
             return "server.rack"
         case .django, .flask, .fastAPI:
             return "bolt.horizontal.circle"
-        case .jetpackCompose, .ktor:
+        case .android, .jetpackCompose, .ktor, .spring:
             return "app.connected.to.app.below.fill"
-        case .gin:
+        case .actix, .tokio:
+            return "gearshape.2.fill"
+        case .gin, .echo, .fiber:
             return "shippingbox.fill"
         }
     }
@@ -41,15 +52,21 @@ enum CourseFramework: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .none:
             return Set(ProgrammingLanguage.allCases)
-        case .swiftUI, .uiKit:
+        case .swiftUI, .uiKit, .vapor:
             return [.swift]
-        case .react, .nextJS, .vue, .express, .node:
+        case .react:
             return [.javascript, .typescript]
+        case .vue, .express, .node, .nextJS:
+            return [.javascript]
+        case .angular, .nestJS:
+            return [.typescript]
         case .django, .flask, .fastAPI:
             return [.python]
-        case .jetpackCompose, .ktor:
+        case .android, .jetpackCompose, .ktor, .spring:
             return [.kotlin]
-        case .gin:
+        case .actix, .tokio:
+            return [.rust]
+        case .gin, .echo, .fiber:
             return [.go]
         }
     }
@@ -59,11 +76,31 @@ enum CourseFramework: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum CourseSkillLevel: String, Codable, CaseIterable, Identifiable {
+    case beginner = "Desde cero"
+    case intermediate = "Intermedio"
+    case advanced = "Avanzado"
+
+    var id: String { rawValue }
+
+    var stars: Int {
+        switch self {
+        case .beginner:
+            return 1
+        case .intermediate:
+            return 2
+        case .advanced:
+            return 3
+        }
+    }
+}
+
 struct CourseGenerationRequest: Codable, Equatable {
     var language: ProgrammingLanguage
     var framework: CourseFramework
     var prompt: String
     var focus: String
+    var level: CourseSkillLevel?
     var createdAt: Date
 
     init(
@@ -71,12 +108,14 @@ struct CourseGenerationRequest: Codable, Equatable {
         framework: CourseFramework = .none,
         prompt: String = "",
         focus: String = "",
+        level: CourseSkillLevel? = nil,
         createdAt: Date = Date()
     ) {
         self.language = language
         self.framework = framework
         self.prompt = prompt
         self.focus = focus
+        self.level = level
         self.createdAt = createdAt
     }
 
@@ -109,6 +148,7 @@ struct CourseGenerationRequest: Codable, Equatable {
             framework: CourseFramework.options(for: language).contains(framework) ? framework : .none,
             prompt: trimmedPrompt,
             focus: trimmedFocus,
+            level: level,
             createdAt: createdAt
         )
     }
@@ -120,10 +160,22 @@ struct CourseGenerationRequest: Codable, Equatable {
 }
 
 enum CustomRouteStatus: String, Codable, Equatable {
-    case requesting
+    case generating
     case queued
     case active
     case failed
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+
+        switch rawValue {
+        case "requesting":
+            self = .generating
+        default:
+            self = CustomRouteStatus(rawValue: rawValue) ?? .generating
+        }
+    }
 }
 
 struct CustomRouteRecord: Codable, Equatable, Identifiable {
@@ -167,7 +219,7 @@ struct CustomRouteRecord: Codable, Equatable, Identifiable {
     static func draft(from request: CourseGenerationRequest) -> CustomRouteRecord {
         CustomRouteRecord(
             request: request.normalized(),
-            status: .requesting
+            status: .generating
         )
     }
 }
