@@ -42,10 +42,11 @@ extension View {
 struct NoiseGrainModifier: ViewModifier {
     let intensity: Float
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.loopCloudMotionEnabled) private var cloudMotionEnabled
     private let startDate = Date()
 
     func body(content: Content) -> some View {
-        if reduceMotion {
+        if reduceMotion || !cloudMotionEnabled {
             content
         } else {
             TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in

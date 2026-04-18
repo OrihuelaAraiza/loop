@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// scrollTransition reusable para cards dentro de ScrollViews.
-/// Hace fade + scale + blur sutil segun la posicion en el viewport.
+/// Hace fade + scale + blur sutil según la posición en el viewport.
 extension View {
     @ViewBuilder
     func loopScrollReveal() -> some View {

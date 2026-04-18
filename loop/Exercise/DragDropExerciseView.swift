@@ -16,7 +16,7 @@ struct DragDropExerciseView: View {
                 Rectangle()
                     .fill(Color.borderSoft)
                     .frame(height: 1)
-                Text(isJuniorMode ? "Tokens disponibles" : "Arrastra desde aqui")
+                Text(isJuniorMode ? "Tokens disponibles" : "Arrastra desde aquí")
                     .font(LoopFont.regular(12))
                     .foregroundColor(.textMuted)
                     .fixedSize()
@@ -35,7 +35,7 @@ struct DragDropExerciseView: View {
 
     private var dropZone: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(isJuniorMode ? "Ordena el codigo aqui:" : "Tu solucion")
+            Text(isJuniorMode ? "Ordena el código aquí:" : "Tu solución")
                 .font(LoopFont.semiBold(13))
                 .foregroundColor(.periwinkle)
 
@@ -48,7 +48,7 @@ struct DragDropExerciseView: View {
                     )
 
                 if placedTokens.isEmpty {
-                    Text(isJuniorMode ? "Arrastra las piezas aqui" : "Arrastra los tokens aqui")
+                    Text(isJuniorMode ? "Arrastra las piezas aquí" : "Arrastra los tokens aquí")
                         .font(LoopFont.regular(14))
                         .foregroundColor(.textMuted)
                         .padding()

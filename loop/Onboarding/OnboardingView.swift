@@ -1,4 +1,3 @@
-import Pow
 import SwiftUI
 import UIKit
 import Combine
@@ -16,7 +15,7 @@ struct OnboardingFlow: View {
                 header
                 stepContent
                     .id(viewModel.step)
-                    .transition(AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             .animation(.spring(response: 0.45, dampingFraction: 0.88), value: viewModel.step)
         }
@@ -260,15 +259,15 @@ private struct OnboardingWelcomeView: View {
     @State private var showFeatures = false
 
     private let features: [(icon: String, tint: Color, title: String, detail: String)] = [
-        ("map.fill", .cerulean, "Rutas claras", "Progreso visual por modulos."),
+        ("map.fill", .cerulean, "Rutas claras", "Progreso visual por módulos."),
         ("bolt.fill", .loopGold, "Sesiones cortas", "Lecciones de alto impacto."),
-        ("checkmark.circle.fill", .amethyst, "Feedback inmediato", "Correccion al instante.")
+        ("checkmark.circle.fill", .amethyst, "Feedback inmediato", "Corrección al instante.")
     ]
 
     var body: some View {
         OnboardingContainer(
             title: "Bienvenido a Loop",
-            subtitle: "Aprende programacion con retos diarios y un plan adaptado a tu ritmo.",
+            subtitle: "Aprende programación con retos diarios y un plan adaptado a tu ritmo.",
             eyebrow: "Inicio"
         ) {
             loopyCard
@@ -291,7 +290,7 @@ private struct OnboardingWelcomeView: View {
                         Group {
                             if showFeatures {
                                 featureRow(icon: feature.icon, tint: feature.tint, title: feature.title, detail: feature.detail)
-                                    .transition(AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity))
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
                             }
                         }
                         .animation(.default.delay(0.1 * Double(index)), value: showFeatures)
@@ -324,7 +323,7 @@ private struct OnboardingWelcomeView: View {
                     .scaleEffect(0.68)
                     .frame(width: 120, height: 130)
                 if showBubble {
-                    LoopyBubbleView(text: "Te guiare paso a paso para construir constancia real y progreso medible.")
+                    LoopyBubbleView(text: "Te guiaré paso a paso para construir constancia real y progreso medible.")
                         .transition(.opacity.combined(with: .scale(scale: 0.92)))
                 } else {
                     LoopyTypingDots()
@@ -336,7 +335,7 @@ private struct OnboardingWelcomeView: View {
                     .scaleEffect(0.68)
                     .frame(width: 120, height: 130)
                 if showBubble {
-                    LoopyBubbleView(text: "Te guiare paso a paso para construir constancia real y progreso medible.")
+                    LoopyBubbleView(text: "Te guiaré paso a paso para construir constancia real y progreso medible.")
                         .transition(.opacity.combined(with: .scale(scale: 0.92)))
                 } else {
                     LoopyTypingDots()
@@ -380,81 +379,101 @@ private struct OnboardingNameView: View {
     }
 
     var body: some View {
-        OnboardingContainer(title: "Tu identidad", subtitle: "Cuentame tu nombre y elige un avatar.", eyebrow: "Perfil") {
-            LoopCard(accentColor: .periwinkle, showsSceneAccent: true) {
-                VStack(alignment: .leading, spacing: Spacing.sm) {
-                    Text("Asi se vera tu perfil")
-                        .font(LoopFont.semiBold(13))
-                        .foregroundColor(.textSecond)
+        ZStack(alignment: .bottom) {
+            OnboardingContainer(title: "Tu identidad", subtitle: "Cuéntame tu nombre y elige un avatar.", eyebrow: "Perfil") {
+                LoopCard(accentColor: .periwinkle, showsSceneAccent: true) {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text("Así se verá tu perfil")
+                            .font(LoopFont.semiBold(13))
+                            .foregroundColor(.textSecond)
 
-                    ViewThatFits(in: .vertical) {
-                        HStack(spacing: Spacing.md) {
-                            profileAvatar
+                        ViewThatFits(in: .vertical) {
+                            HStack(spacing: Spacing.md) {
+                                profileAvatar
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                profileTitle
-                                Text("Tu nombre aparecera en tu racha, perfil y celebraciones.")
-                                    .font(LoopFont.regular(13))
-                                    .foregroundColor(.textSecond)
-                                    .fixedSize(horizontal: false, vertical: true)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    profileTitle
+                                    Text("Tu nombre aparecerá en tu racha, perfil y celebraciones.")
+                                        .font(LoopFont.regular(13))
+                                        .foregroundColor(.textSecond)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+
+                            VStack(alignment: .leading, spacing: Spacing.sm) {
+                                profileAvatar
+                                VStack(alignment: .leading, spacing: 4) {
+                                    profileTitle
+                                    Text("Tu nombre aparecerá en tu racha, perfil y celebraciones.")
+                                        .font(LoopFont.regular(13))
+                                        .foregroundColor(.textSecond)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
                         }
+                    }
 
-                        VStack(alignment: .leading, spacing: Spacing.sm) {
-                            profileAvatar
-                            VStack(alignment: .leading, spacing: 4) {
-                                profileTitle
-                                Text("Tu nombre aparecera en tu racha, perfil y celebraciones.")
-                                    .font(LoopFont.regular(13))
-                                    .foregroundColor(.textSecond)
-                                    .fixedSize(horizontal: false, vertical: true)
+                    Divider().overlay(Color.borderSoft)
+
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text("Nombre")
+                            .font(LoopFont.semiBold(13))
+                            .foregroundColor(.textSecond)
+
+                        TextField("Tu nombre", text: $viewModel.userProfile.name)
+                            .font(LoopFont.medium(17))
+                            .foregroundColor(.textPrimary)
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled(true)
+                            .submitLabel(.done)
+                            .onSubmit {
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            }
+                            .padding(.horizontal, Spacing.md)
+                            .padding(.vertical, 14)
+                            .background(Color.loopSurf2.opacity(0.82))
+                            .clipShape(RoundedRectangle(cornerRadius: Radius.md))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radius.md)
+                                    .stroke(Color.borderMid, lineWidth: 1)
+                            )
+                    }
+
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text("Avatar")
+                            .font(LoopFont.semiBold(13))
+                            .foregroundColor(.textSecond)
+
+                        LazyVGrid(columns: columns, spacing: Spacing.sm) {
+                            ForEach(0 ..< avatars.count, id: \.self) { index in
+                                avatarButton(index: index)
                             }
                         }
                     }
                 }
 
-                Divider().overlay(Color.borderSoft)
-
-                VStack(alignment: .leading, spacing: Spacing.sm) {
-                    Text("Nombre")
-                        .font(LoopFont.semiBold(13))
-                        .foregroundColor(.textSecond)
-
-                    TextField("Tu nombre", text: $viewModel.userProfile.name)
-                        .font(LoopFont.medium(17))
-                        .foregroundColor(.textPrimary)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled(true)
-                        .submitLabel(.done)
-                        .onSubmit {
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                        }
-                        .padding(.horizontal, Spacing.md)
-                        .padding(.vertical, 14)
-                        .background(Color.loopSurf2.opacity(0.82))
-                        .clipShape(RoundedRectangle(cornerRadius: Radius.md))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Radius.md)
-                                .stroke(Color.borderMid, lineWidth: 1)
-                        )
-                }
-
-                VStack(alignment: .leading, spacing: Spacing.sm) {
-                    Text("Avatar")
-                        .font(LoopFont.semiBold(13))
-                        .foregroundColor(.textSecond)
-
-                    LazyVGrid(columns: columns, spacing: Spacing.sm) {
-                        ForEach(0 ..< avatars.count, id: \.self) { index in
-                            avatarButton(index: index)
-                        }
-                    }
-                }
+                Color.clear.frame(height: 96)
             }
-            LoopCTA(title: "Continuar", trailingIcon: "arrow.right", isDisabled: trimmedName.isEmpty, style: .solid(.coral)) {
-                viewModel.userProfile.name = trimmedName
-                viewModel.next()
+
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [Color.loopBG.opacity(0), Color.loopBG.opacity(0.92)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 24)
+                .allowsHitTesting(false)
+
+                LoopCTA(title: "Continuar", trailingIcon: "arrow.right", isDisabled: trimmedName.isEmpty, style: .solid(.coral)) {
+                    viewModel.userProfile.name = trimmedName
+                    viewModel.next()
+                }
+                .padding(.horizontal, Spacing.xl)
+                .padding(.bottom, Spacing.md)
+                .padding(.top, Spacing.sm)
+                .background(Color.loopBG.opacity(0.95))
             }
+            .ignoresSafeArea(.keyboard, edges: .bottom)
         }
     }
 
@@ -529,9 +548,6 @@ private struct OnboardingNameView: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
         }
         .buttonStyle(.plain)
-        .changeEffect(.spray(origin: UnitPoint.center) {
-            Image(systemName: "sparkle").foregroundColor(.coral)
-        }, value: isSelected, isEnabled: isSelected)
         .accessibilityLabel(Text("Avatar \(index + 1)"))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
     }
@@ -555,6 +571,7 @@ private struct OnboardingAgeView: View {
             )
             LoopCTA(title: "Continuar", trailingIcon: "arrow.right", style: .solid(.coral)) { viewModel.next() }
         }
+        .loopCloudMotion(false)
     }
 }
 
@@ -576,20 +593,20 @@ private struct AgeDialPicker: View {
         case 4 ... 12:
             return ("Guiado", "Ritmo guiado, ejemplos claros y progreso muy visual.", .mint)
         case 13 ... 15:
-            return ("Explora", "Practica corta y claridad total para que avanzar se sienta ligero.", .periwinkle)
+            return ("Explora", "Práctica corta y claridad total para que avanzar se sienta ligero.", .periwinkle)
         case 16 ... 18:
-            return ("Prepa", "Fundamentos mas proyectos para sumar traccion desde la semana uno.", .coral)
+            return ("Prepa", "Fundamentos más proyectos para sumar tracción desde la semana uno.", .coral)
         case 19 ... 22:
-            return ("Carrera", "Mas intensidad y ejemplos reales para conectar teoria con practica.", .amethyst)
+            return ("Carrera", "Más intensidad y ejemplos reales para conectar teoría con práctica.", .amethyst)
         case 23 ... 28:
             return ("Portfolio", "Constancia, proyectos y avance visible sin saturar tu semana.", .loopGold)
         default:
-            return ("Pro", "Sesiones flexibles y enfoque practico para aprovechar mejor tu tiempo.", .cerulean)
+            return ("Pro", "Sesiones flexibles y enfoque práctico para aprovechar mejor tu tiempo.", .cerulean)
         }
     }
 
     var body: some View {
-        LoopCard(accentColor: ageDescriptor.tint, showsSceneAccent: true) {
+        LoopCard(accentColor: .clear) {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 ViewThatFits(in: .vertical) {
                     HStack(alignment: .top, spacing: Spacing.md) {
@@ -621,11 +638,6 @@ private struct AgeDialPicker: View {
                 }
 
                 ZStack {
-                    Circle()
-                        .fill(ageDescriptor.tint.opacity(0.08))
-                        .frame(width: ringSize, height: ringSize)
-                        .blur(radius: 2)
-
                     Circle()
                         .stroke(Color.trackInactive, lineWidth: ringLineWidth)
                         .frame(width: ringSize, height: ringSize)
@@ -680,7 +692,7 @@ private struct AgeDialPicker: View {
                                         Text(title)
                                             .font(LoopFont.bold(13))
                                             .foregroundColor(Color.loopBG.opacity(0.72))
-                                            .transition(.asymmetric(insertion: .movingParts.pop, removal: .movingParts.poof))
+                                            .transition(.opacity.combined(with: .scale(scale: 0.92)))
                                     }
                                 }
                                 .animation(LoopAnimation.springBouncy, value: ageDescriptor.title)
@@ -884,7 +896,7 @@ private struct OnboardingGoalView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.coral)
-                                .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .movingParts.poof))
+                                .transition(.scale.combined(with: .opacity))
                         } else {
                             Image(systemName: "circle")
                                 .font(.system(size: 20))
@@ -896,9 +908,6 @@ private struct OnboardingGoalView: View {
             }
         }
         .buttonStyle(.plain)
-        .changeEffect(.spray(origin: UnitPoint.center) {
-            Image(systemName: "sparkle").foregroundColor(.coral)
-        }, value: isSelected, isEnabled: isSelected)
     }
 }
 
@@ -914,15 +923,15 @@ private struct OnboardingLevelView: View {
             }
 
             if viewModel.wantsPlacementTest {
-                OnboardingMiniPill(icon: "lock.fill", text: "El mini test definira tu nivel", tint: .loopGold)
-                    .transition(AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity))
+                OnboardingMiniPill(icon: "lock.fill", text: "El mini test definirá tu nivel", tint: .loopGold)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
             placementTestCard
 
             if viewModel.wantsPlacementTest {
                 placementExplainer
-                    .transition(AnyTransition.MovingParts.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
             LoopCTA(title: "Continuar", trailingIcon: "arrow.right", style: .solid(.coral)) {
@@ -975,7 +984,7 @@ private struct OnboardingLevelView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.coral)
-                                .transition(.asymmetric(insertion: .scale.combined(with: .opacity), removal: .movingParts.poof))
+                                .transition(.scale.combined(with: .opacity))
                         }
                     }
                     .animation(LoopAnimation.springBouncy, value: isSelected)
@@ -984,9 +993,6 @@ private struct OnboardingLevelView: View {
         }
         .buttonStyle(.plain)
         .disabled(viewModel.wantsPlacementTest)
-        .changeEffect(.spray(origin: UnitPoint.center) {
-            Image(systemName: "sparkle").foregroundColor(.amethyst)
-        }, value: isSelected, isEnabled: isSelected && !viewModel.wantsPlacementTest)
     }
 
     private var placementTestCard: some View {
@@ -996,7 +1002,7 @@ private struct OnboardingLevelView: View {
                     Text("Hacer mini test de placement")
                         .font(LoopFont.semiBold(14))
                         .foregroundColor(.textPrimary)
-                    Text("Si activas esto, arrancamos con 3 preguntas para ajustar mejor tu modulo inicial.")
+                    Text("Si activas esto, arrancamos con 3 preguntas para ajustar mejor tu módulo inicial.")
                         .font(LoopFont.regular(13))
                         .foregroundColor(.textSecond)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1005,6 +1011,7 @@ private struct OnboardingLevelView: View {
                 LoopPlacementToggle(isOn: $viewModel.wantsPlacementTest)
             }
         }
+        .loopCloudMotion(viewModel.wantsPlacementTest)
     }
 
     private var placementExplainer: some View {
@@ -1015,19 +1022,19 @@ private struct OnboardingLevelView: View {
                     .foregroundColor(.textPrimary)
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "1.circle.fill").foregroundColor(.loopGold)
-                    Text("Una de sintaxis basica para calibrar confianza.")
+                    Text("Una de sintaxis básica para calibrar confianza.")
                         .font(LoopFont.regular(12))
                         .foregroundColor(.textSecond)
                 }
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "2.circle.fill").foregroundColor(.loopGold)
-                    Text("Una de logica para ver como piensas el flujo.")
+                    Text("Una de lógica para ver cómo piensas el flujo.")
                         .font(LoopFont.regular(12))
                         .foregroundColor(.textSecond)
                 }
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "3.circle.fill").foregroundColor(.loopGold)
-                    Text("Una de lectura de codigo para detectar nivel real.")
+                    Text("Una de lectura de código para detectar nivel real.")
                         .font(LoopFont.regular(12))
                         .foregroundColor(.textSecond)
                 }
@@ -1040,11 +1047,11 @@ private struct OnboardingLevelView: View {
         case .zero:
             return "Prefieres partir sin asumir contexto previo."
         case .someReading:
-            return "Ya viste conceptos sueltos, pero todavia no se sienten naturales."
+            return "Ya viste conceptos sueltos, pero todavía no se sienten naturales."
         case .basicKnows:
-            return "Entiendes la base y quieres practicar con mas direccion."
+            return "Entiendes la base y quieres practicar con más dirección."
         case .hasPractice:
-            return "Ya haces ejercicios y buscas mas consistencia o profundidad."
+            return "Ya haces ejercicios y buscas más consistencia o profundidad."
         }
     }
 
@@ -1110,7 +1117,7 @@ private struct OnboardingTimeView: View {
                 }
 
                 VStack(alignment: .leading, spacing: Spacing.sm) {
-                    Text("Dias activos")
+                    Text("Días activos")
                         .font(LoopFont.semiBold(13))
                         .foregroundColor(.textSecond)
 
@@ -1132,13 +1139,13 @@ private struct OnboardingTimeView: View {
                         }
                     }
 
-                    Text("Selecciona los dias en los que de verdad puedes sostener el ritmo.")
+                    Text("Selecciona los días en los que de verdad puedes sostener el ritmo.")
                         .font(LoopFont.regular(12))
                         .foregroundColor(.textSecond)
                 }
 
                 VStack(alignment: .leading, spacing: Spacing.sm) {
-                    Text("Minutos por dia")
+                    Text("Minutos por día")
                         .font(LoopFont.semiBold(13))
                         .foregroundColor(.textSecond)
 
@@ -1248,7 +1255,7 @@ private struct OnboardingTimeView: View {
 
     private var activeDaysSummary: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("\(viewModel.userProfile.activeDays.count) dias activos")
+            Text("\(viewModel.userProfile.activeDays.count) días activos")
                 .font(LoopFont.bold(18))
                 .foregroundColor(.mint)
                 .contentTransition(.numericText())
@@ -1270,12 +1277,12 @@ private struct OnboardingPlanView: View {
     var body: some View {
         let plan = viewModel.userProfile.generatedPlan ?? PlanGenerator.generatePlan(from: viewModel.userProfile)
         let course = appState.currentCourse
-        let headerTitle = course?.generatedCourseTitle ?? "\(plan.language.rawValue) · Modulo \(plan.startModule)"
+        let headerTitle = course?.generatedCourseTitle ?? "\(plan.language.rawValue) · Módulo \(plan.startModule)"
         let headerSubtitle = courseHeaderSubtitle(plan: plan, course: course)
         let reasons = courseReasons(plan: plan, course: course)
 
         OnboardingContainer(
-            title: "Tu plan esta listo",
+            title: "Tu plan está listo",
             subtitle: "Mostramos datos reales del agente mientras termina de generar tu curso.",
             eyebrow: "Plan IA"
         ) {
@@ -1305,7 +1312,7 @@ private struct OnboardingPlanView: View {
                     ViewThatFits(in: .vertical) {
                         HStack(spacing: Spacing.sm) {
                             planMetric(title: "Ritmo", value: "\(viewModel.userProfile.minutesPerDay)m", tint: .coral)
-                            planMetric(title: "Dias", value: "\(viewModel.userProfile.activeDays.count)", tint: .mint)
+                            planMetric(title: "Días", value: "\(viewModel.userProfile.activeDays.count)", tint: .mint)
                             planMetric(
                                 title: "Modulos",
                                 value: "\(course?.generatedModulesCount ?? plan.startModule)",
@@ -1315,7 +1322,7 @@ private struct OnboardingPlanView: View {
 
                         VStack(spacing: Spacing.sm) {
                             planMetric(title: "Ritmo", value: "\(viewModel.userProfile.minutesPerDay)m", tint: .coral)
-                            planMetric(title: "Dias", value: "\(viewModel.userProfile.activeDays.count)", tint: .mint)
+                            planMetric(title: "Días", value: "\(viewModel.userProfile.activeDays.count)", tint: .mint)
                             planMetric(
                                 title: "Modulos",
                                 value: "\(course?.generatedModulesCount ?? plan.startModule)",
@@ -1399,7 +1406,7 @@ private struct OnboardingPlanView: View {
             return generatedDescription
         }
 
-        return "Vas a practicar \(viewModel.userProfile.minutesPerDay) minutos en \(viewModel.userProfile.activeDays.count) dias para construir ritmo antes de subir intensidad en \(plan.language.rawValue)."
+        return "Vas a practicar \(viewModel.userProfile.minutesPerDay) minutos en \(viewModel.userProfile.activeDays.count) días para construir ritmo antes de subir intensidad en \(plan.language.rawValue)."
     }
 
     private func planMetric(title: String, value: String, tint: Color) -> some View {

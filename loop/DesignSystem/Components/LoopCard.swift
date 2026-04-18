@@ -4,6 +4,7 @@ struct LoopCard<Content: View>: View {
     var accentColor: Color = .clear
     var showsSceneAccent = false
     var usesGlassSurface = false
+    @Environment(\.loopCloudMotionEnabled) private var cloudMotionEnabled
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -34,7 +35,7 @@ struct LoopCard<Content: View>: View {
                 )
                 .shadow(color: Color.black.opacity(0.22), radius: 20, y: 14)
 
-            if accentColor != .clear {
+            if cloudMotionEnabled, accentColor != .clear {
                 RoundedRectangle(cornerRadius: Radius.lg)
                     .fill(
                         LinearGradient(

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Animación de seleccion unificada para chips/cards: un pulso radial que nace
+/// Animación de selección unificada para chips/cards: un pulso radial que nace
 /// del propio contenedor cuando el elemento entra en estado `isSelected`.
 /// No depende de Pow y no puede "desfasarse": se ancla al frame del elemento.
 struct LoopSelectionBloom: ViewModifier {

@@ -45,3 +45,7 @@ struct AnswerResponse: Hashable {
     let xpEarned: Int
     let correctAnswerDisplay: String?
 }
+
+enum ExerciseAnswerSentinel {
+    static let timedOut = "__loop_timeout__"
+}

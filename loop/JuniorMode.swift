@@ -50,25 +50,25 @@ struct LoopCopy {
     static func streakMessage(days: Int, junior: Bool) -> String {
         if junior {
             return days == 0
-                ? "Hola! Hoy es tu primer dia. Vamos a aprender algo cool."
-                : "Llevas \(days) dias seguidos. Eso es increible!"
+                ? "Hola! Hoy es tu primer día. Vamos a aprender algo cool."
+                : "Llevas \(days) días seguidos. Eso es increíble!"
         } else {
             return days == 0
-                ? "Tu leccion del dia esta lista."
-                : "Llevas \(days) dias seguidos. No pares ahora."
+                ? "Tu lección del día está lista."
+                : "Llevas \(days) días seguidos. No pares ahora."
         }
     }
 
     static func correctMessage(junior: Bool) -> String {
         junior
-            ? ["Perfecto!", "Lo lograste!", "Eres increible!", "Asi se hace!"].randomElement()!
+            ? ["Perfecto!", "Lo lograste!", "Eres increíble!", "Así se hace!"].randomElement()!
             : ["Correcto.", "Exacto.", "Bien hecho."].randomElement()!
     }
 
     static func incorrectMessage(junior: Bool) -> String {
         junior
-            ? "Casi! Intentalo de nuevo, tu puedes."
-            : "No es correcto. Revisa la explicacion."
+            ? "Casi! Inténtalo de nuevo, tú puedes."
+            : "No es correcto. Revisa la explicación."
     }
 
     static func routesTitle(junior: Bool) -> String {
@@ -88,7 +88,7 @@ struct LoopCopy {
     }
 
     static func streakLabel(junior: Bool) -> String {
-        junior ? "Dias seguidos" : "Racha"
+        junior ? "Días seguidos" : "Racha"
     }
 
     static func focusLabel(junior: Bool) -> String {
@@ -100,15 +100,15 @@ struct LoopCopy {
     }
 
     static func completedLabel(junior: Bool) -> String {
-        junior ? "Lo logre!" : "Completado"
+        junior ? "Lo logré!" : "Completado"
     }
 
     static func lockedLabel(junior: Bool) -> String {
-        junior ? "Aun no disponible" : "Bloqueado"
+        junior ? "Aún no disponible" : "Bloqueado"
     }
 
     static func continueHereLabel(junior: Bool) -> String {
-        junior ? "Tu mision actual" : "Continua aqui"
+        junior ? "Tu misión actual" : "Continúa aquí"
     }
 }
 

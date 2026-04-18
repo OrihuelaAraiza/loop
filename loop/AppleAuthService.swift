@@ -147,7 +147,7 @@ private struct AuthAPIClient {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw AuthAPIError(message: "No se recibio respuesta del servidor.")
+            throw AuthAPIError(message: "No se recibió respuesta del servidor.")
         }
 
         if (200 ... 299).contains(httpResponse.statusCode) {

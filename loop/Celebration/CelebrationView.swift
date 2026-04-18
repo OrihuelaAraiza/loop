@@ -1,10 +1,47 @@
 import SwiftUI
 
 struct CelebrationView: View {
-    @StateObject private var viewModel = CelebrationViewModel()
+    @EnvironmentObject var appState: AppState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var displayXP: Int = 0
     let onNext: () -> Void
+
+    private var completionXP: Int {
+        appState.lastLessonCompletion?.xpGained ?? 0
+    }
+
+    private var readyLessons: Int {
+        min(appState.currentCourse?.resolvedReadyLessons ?? 0, max(totalLessons, 0))
+    }
+
+    private var totalLessons: Int {
+        max(appState.currentCourse?.totalLessons ?? 0, 0)
+    }
+
+    private var celebrationHighlights: [String] {
+        var highlights: [String] = []
+
+        if let lessonTitle = appState.lastLessonCompletion?.lessonTitle,
+           !lessonTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            highlights.append(lessonTitle)
+        }
+
+        if let course = appState.currentCourse {
+            highlights.append(course.resolvedTitle)
+            if totalLessons > 0 {
+                highlights.append("\(readyLessons) de \(totalLessons) lecciones listas")
+            }
+        }
+
+        highlights.append("\(appState.gameState.hearts) corazones disponibles")
+        return Array(highlights.prefix(4))
+    }
+
+    private var streakSegments: [Bool] {
+        let total = max(min(10, max(appState.gameState.currentStreak, 1)), 1)
+        let done = min(appState.gameState.currentStreak, total)
+        return (0 ..< total).map { $0 < done }
+    }
 
     var body: some View {
         ZStack {
@@ -18,7 +55,7 @@ struct CelebrationView: View {
                 VStack(spacing: Spacing.lg) {
                     celebratingLoopy
 
-                    Text("Leccion completada")
+                    Text("Lección completada")
                         .font(LoopFont.black(28))
                         .foregroundColor(.textPrimary)
                         .multilineTextAlignment(.center)
@@ -31,7 +68,7 @@ struct CelebrationView: View {
                     badgeGrid
                     streakBar
 
-                    LoopCTA(title: "Siguiente leccion") {
+                    LoopCTA(title: "Siguiente lección") {
                         HapticManager.shared.impact(.medium)
                         onNext()
                     }
@@ -42,12 +79,12 @@ struct CelebrationView: View {
         }
         .onAppear {
             HapticManager.shared.success()
-            withAnimation(.easeOut(duration: 0.9)) {
-                displayXP = viewModel.xpGained
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                LoopToast.lessonComplete(xp: viewModel.xpGained)
-            }
+            animateXP(to: completionXP)
+            presentCompletionToastIfNeeded(xp: completionXP)
+        }
+        .onChange(of: completionXP) { _, newXP in
+            animateXP(to: newXP)
+            presentCompletionToastIfNeeded(xp: newXP)
         }
     }
 
@@ -67,18 +104,17 @@ struct CelebrationView: View {
 
     private var badgeGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.sm) {
-            ForEach(Array(viewModel.badges.enumerated()), id: \.offset) { idx, badge in
-                LoopCard(accentColor: idx < 2 ? .amethyst : .clear) {
-                    Text(badge)
+            ForEach(Array(celebrationHighlights.enumerated()), id: \.offset) { idx, highlight in
+                LoopCard(accentColor: idx == 0 ? .amethyst : .clear) {
+                    Text(highlight)
                         .font(LoopFont.semiBold(13))
-                        .foregroundColor(idx < 2 ? .textPrimary : .textMuted)
+                        .foregroundColor(.textPrimary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .frame(minHeight: 40)
                         .padding(.vertical, Spacing.sm)
                 }
-                .opacity(idx < 2 ? 1 : 0.45)
             }
         }
     }
@@ -86,11 +122,11 @@ struct CelebrationView: View {
     private var streakBar: some View {
         LoopCard(accentColor: .loopGold) {
             VStack(alignment: .leading, spacing: Spacing.sm) {
-                Text("Racha de 10 dias")
+                Text("Racha actual: \(appState.gameState.currentStreak) días")
                     .font(LoopFont.bold(14))
                     .foregroundColor(.textPrimary)
                 HStack(spacing: Spacing.xs) {
-                    ForEach(Array(viewModel.streakDays.enumerated()), id: \.offset) { _, done in
+                    ForEach(Array(streakSegments.enumerated()), id: \.offset) { _, done in
                         RoundedRectangle(cornerRadius: Radius.pill)
                             .fill(done ? Color.loopGold : Color.loopSurf3)
                             .frame(height: 8)
@@ -99,5 +135,17 @@ struct CelebrationView: View {
             }
         }
     }
-}
 
+    private func animateXP(to value: Int) {
+        withAnimation(.easeOut(duration: 0.9)) {
+            displayXP = value
+        }
+    }
+
+    private func presentCompletionToastIfNeeded(xp: Int) {
+        guard xp > 0 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            LoopToast.lessonComplete(xp: xp)
+        }
+    }
+}

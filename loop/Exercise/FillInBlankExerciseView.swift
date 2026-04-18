@@ -20,7 +20,7 @@ struct FillInBlankExerciseView: View {
 
                 HStack {
                     TextField(
-                        isJuniorMode ? "Escribe aqui..." : "Escribe tu respuesta",
+                        isJuniorMode ? "Escribe aquí..." : "Escribe tu respuesta",
                         text: $userAnswer
                     )
                     .font(.system(size: 16, design: .monospaced))

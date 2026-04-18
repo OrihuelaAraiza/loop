@@ -41,7 +41,7 @@ struct TriviaExerciseView: View {
 
             if timedOut {
                 Text(isJuniorMode
-                     ? "Se acabo el tiempo. Toca Verificar para ver la explicacion."
+                     ? "Se acabó el tiempo. Toca Verificar para ver la explicación."
                      : "Tiempo agotado. Toca Verificar para revisar la respuesta.")
                     .font(LoopFont.regular(13))
                     .foregroundColor(.textSecond)
@@ -54,7 +54,7 @@ struct TriviaExerciseView: View {
             if timeRemaining == 0 {
                 timerActive = false
                 timedOut = true
-                userAnswer = LoopMockClient.timedOutAnswer
+                userAnswer = ExerciseAnswerSentinel.timedOut
                 HapticManager.shared.error()
             }
         }

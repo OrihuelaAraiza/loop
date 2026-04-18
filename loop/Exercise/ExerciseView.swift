@@ -15,20 +15,35 @@ struct ExerciseView: View {
     }
 
     var body: some View {
-        ExerciseContainerView(
-            exercise: viewModel.currentExercise,
-            viewModel: viewModel,
-            onSequenceCompleted: handleSequenceCompleted,
-            onClose: closeFlow
-        )
+        Group {
+            if let exercise = viewModel.currentExercise {
+                ExerciseContainerView(
+                    exercise: exercise,
+                    viewModel: viewModel,
+                    onSequenceCompleted: handleSequenceCompleted,
+                    onClose: closeFlow
+                )
+            } else {
+                ExerciseUnavailableView(
+                    message: viewModel.loadError ?? "No pudimos cargar ejercicios desde el backend.",
+                    onClose: closeFlow
+                )
+            }
+        }
     }
 
     private func handleSequenceCompleted() {
-        if let lessonID = viewModel.lessonID,
-           let token = appState.authSession?.apiToken {
+        if let lessonID = viewModel.lessonID {
+            appState.lastLessonCompletion = LessonCompletionSummary(
+                lessonID: lessonID,
+                lessonTitle: viewModel.lessonTitle,
+                xpGained: viewModel.lessonXPReward ?? 0,
+                heartsRemaining: appState.gameState.hearts,
+                completedAt: Date()
+            )
+
             Task {
-                _ = try? await OnboardingAPIClient().completeLesson(token: token, lessonID: lessonID)
-                await MainActor.run { appState.refreshTodayLesson() }
+                await appState.completeLesson(lessonID: lessonID, lessonTitle: viewModel.lessonTitle)
             }
         }
 
@@ -40,6 +55,39 @@ struct ExerciseView: View {
             onClose()
         } else {
             dismiss()
+        }
+    }
+}
+
+private struct ExerciseUnavailableView: View {
+    let message: String
+    let onClose: () -> Void
+
+    var body: some View {
+        ZStack {
+            LoopMeshBackground()
+
+            VStack(spacing: Spacing.lg) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.loopGold)
+
+                VStack(spacing: Spacing.sm) {
+                    Text("Ejercicios no disponibles")
+                        .font(LoopFont.bold(22))
+                        .foregroundColor(.textPrimary)
+
+                    Text(message)
+                        .font(LoopFont.regular(14))
+                        .foregroundColor(.textSecond)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                LoopCTA(title: "Cerrar", style: .solid(.coral), action: onClose)
+            }
+            .padding(.horizontal, Spacing.xl)
+            .frame(maxWidth: 420)
         }
     }
 }

@@ -89,7 +89,7 @@ struct LessonTheoryView: View {
                     .overlay(Circle().stroke(Color.borderMid, lineWidth: 1))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Cerrar teoria")
+            .accessibilityLabel("Cerrar teoría")
 
             Spacer()
 
@@ -97,7 +97,7 @@ struct LessonTheoryView: View {
                 Image(systemName: "book.closed.fill")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.periwinkle)
-                Text("Teoria · \(currentPage + 1)/\(totalPages)")
+                Text("Teoría · \(currentPage + 1)/\(totalPages)")
                     .font(LoopFont.bold(12))
                     .foregroundColor(.textSecond)
             }
@@ -159,7 +159,7 @@ struct LessonTheoryView: View {
     private var lessonHero: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             HStack(spacing: Spacing.sm) {
-                heroPill(icon: "number", text: "Leccion \(lesson.orderIndex)", color: .periwinkle)
+                heroPill(icon: "number", text: "Lección \(lesson.orderIndex)", color: .periwinkle)
                 heroPill(icon: "clock.fill", text: "\(lesson.estimatedMinutes) min", color: .cerulean)
                 heroPill(icon: "bolt.fill", text: "+\(lesson.xpReward) XP", color: .loopGold)
             }
@@ -187,12 +187,12 @@ struct LessonTheoryView: View {
 
     private var introSummary: String {
         if theoryBlocks.isEmpty {
-            return "Vamos a saltar directo a la practica con ejercicios personalizados para este tema."
+            return "Vamos a saltar directo a la práctica con ejercicios personalizados para este tema."
         }
 
         let count = theoryBlocks.count
         let pluralized = count == 1 ? "concepto" : "conceptos"
-        return "Antes de practicar, vamos a revisar \(count) \(pluralized) clave. Deslizate pagina por pagina y al final encontraras ejercicios para reforzar todo."
+        return "Antes de practicar, vamos a revisar \(count) \(pluralized) clave. Deslízate página por página y al final encontrarás ejercicios para reforzar todo."
     }
 
     private var agendaCard: some View {
@@ -267,10 +267,10 @@ struct LessonTheoryView: View {
                     .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Sin teoria extra")
+                    Text("Sin teoría extra")
                         .font(LoopFont.bold(15))
                         .foregroundColor(.textPrimary)
-                    Text("Esta leccion se enfoca 100% en practica. Toca continuar para empezar a resolver ejercicios.")
+                    Text("Esta lección se enfoca 100% en práctica. Toca continuar para empezar a resolver ejercicios.")
                         .font(LoopFont.regular(13))
                         .foregroundColor(.textSecond)
                         .fixedSize(horizontal: false, vertical: true)
@@ -284,7 +284,7 @@ struct LessonTheoryView: View {
             Image(systemName: "hand.draw.fill")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.textMuted)
-            Text(theoryBlocks.isEmpty ? "Toca 'Ir a ejercicios' para continuar" : "Deslizate para avanzar")
+            Text(theoryBlocks.isEmpty ? "Toca 'Ir a ejercicios' para continuar" : "Deslízate para avanzar")
                 .font(LoopFont.regular(12))
                 .foregroundColor(.textMuted)
         }
@@ -302,18 +302,19 @@ struct LessonTheoryView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 blockHero(block: block, pageIndex: pageIndex)
-                blockBody(block: block, pageIndex: pageIndex)
-
-                if !block.examples.isEmpty {
-                    examplesSection(block: block, pageIndex: pageIndex)
-                }
 
                 if let snippet = block.codeSnippet, !snippet.isEmpty {
                     codeSnippetSection(snippet: snippet, language: block.language ?? courseLanguage)
                 }
 
+                blockBody(block: block, pageIndex: pageIndex)
+
                 if !block.keyPoints.isEmpty {
                     keyPointsSection(points: block.keyPoints, tint: blockTint(for: pageIndex - 1))
+                }
+
+                if !block.examples.isEmpty {
+                    examplesSection(block: block, pageIndex: pageIndex)
                 }
             }
             .padding(.top, Spacing.sm)

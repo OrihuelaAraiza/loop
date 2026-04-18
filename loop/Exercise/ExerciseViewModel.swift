@@ -3,8 +3,6 @@ import Foundation
 
 @MainActor
 final class ExerciseViewModel: ObservableObject {
-    private let client: LoopMockClient
-
     @Published private(set) var exercises: [ExerciseResponse]
     @Published private(set) var currentIndex = 0
     @Published var userAnswer = ""
@@ -14,20 +12,30 @@ final class ExerciseViewModel: ObservableObject {
     @Published private(set) var feedbackTitle = ""
     @Published private(set) var hintsRevealed = 0
     @Published private(set) var revealedCorrectAnswer = false
+    @Published private(set) var loadError: String?
 
     let lessonID: String?
+    let lessonTitle: String?
+    let lessonXPReward: Int?
 
-    init(lesson: LessonPayload? = nil, client: LoopMockClient? = nil) {
-        let resolvedClient = client ?? LoopMockClient.shared
-        self.client = resolvedClient
+    init(lesson: LessonPayload? = nil) {
         self.lessonID = lesson?.id
+        self.lessonTitle = lesson?.title
+        self.lessonXPReward = lesson?.xpReward
 
         let mapped = lesson.map(Self.buildExercises(from:)) ?? []
-        self.exercises = mapped.isEmpty ? resolvedClient.lessonOfTheDay() : mapped
+        self.exercises = mapped
+
+        if lesson == nil {
+            loadError = "Todavía no hay una lección disponible desde el backend."
+        } else if mapped.isEmpty {
+            loadError = "La lección se cargó, pero no trae ejercicios válidos."
+        }
     }
 
-    var currentExercise: ExerciseResponse {
-        exercises[currentIndex]
+    var currentExercise: ExerciseResponse? {
+        guard exercises.indices.contains(currentIndex) else { return nil }
+        return exercises[currentIndex]
     }
 
     var moduleProgress: Double {
@@ -36,19 +44,21 @@ final class ExerciseViewModel: ObservableObject {
     }
 
     var isLastExercise: Bool {
-        currentIndex == exercises.count - 1
+        !exercises.isEmpty && currentIndex == exercises.count - 1
     }
 
     var hasMoreHints: Bool {
-        hintsRevealed < currentExercise.hints.count
+        guard let currentExercise else { return false }
+        return hintsRevealed < currentExercise.hints.count
     }
 
     var currentHint: String? {
-        currentExercise.hints.prefix(hintsRevealed).last
+        currentExercise?.hints.prefix(hintsRevealed).last
     }
 
     var revealedHints: [String] {
-        Array(currentExercise.hints.prefix(hintsRevealed))
+        guard let currentExercise else { return [] }
+        return Array(currentExercise.hints.prefix(hintsRevealed))
     }
 
     func revealNextHint() {
@@ -57,12 +67,14 @@ final class ExerciseViewModel: ObservableObject {
     }
 
     func submitAnswer(isJuniorMode: Bool) async {
-        guard !isSubmitting else { return }
+        guard !isSubmitting, let currentExercise else { return }
 
         isSubmitting = true
         revealedCorrectAnswer = false
 
-        let result = await client.submit(answer: userAnswer, for: currentExercise)
+        try? await Task.sleep(for: .milliseconds(250))
+
+        let result = Self.evaluate(answer: userAnswer, for: currentExercise)
         answerResult = result
         feedbackTitle = result.isCorrect
             ? LoopCopy.correctMessage(junior: isJuniorMode)
@@ -206,5 +218,48 @@ final class ExerciseViewModel: ObservableObject {
         default:
             return .fillInBlank
         }
+    }
+
+    private static func evaluate(answer: String, for exercise: ExerciseResponse) -> AnswerResponse {
+        let isCorrect = switch exercise.type {
+        case .fillInBlank, .trivia:
+            normalizePlain(answer) == normalizePlain(exercise.correctAnswer)
+        case .dragAndDrop:
+            normalizeTokens(answer) == normalizeTokens(exercise.correctAnswer)
+        case .debug:
+            normalizePlain(answer) == normalizePlain(exercise.correctAnswer)
+        case .miniProject:
+            normalizeCode(answer) == normalizeCode(exercise.correctAnswer)
+        }
+
+        return AnswerResponse(
+            isCorrect: isCorrect,
+            xpEarned: isCorrect ? exercise.xpReward : 0,
+            correctAnswerDisplay: exercise.correctAnswerDisplay ?? exercise.correctAnswer
+        )
+    }
+
+    private static func normalizePlain(_ value: String) -> String {
+        guard value != ExerciseAnswerSentinel.timedOut else { return "__timeout__" }
+        return value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    private static func normalizeTokens(_ value: String) -> String {
+        guard value != ExerciseAnswerSentinel.timedOut else { return "__timeout__" }
+        return value
+            .split(separator: "|")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .joined(separator: "|")
+    }
+
+    private static func normalizeCode(_ value: String) -> String {
+        guard value != ExerciseAnswerSentinel.timedOut else { return "__timeout__" }
+        return value
+            .replacingOccurrences(of: "'", with: "\"")
+            .components(separatedBy: .whitespacesAndNewlines)
+            .joined()
+            .lowercased()
     }
 }

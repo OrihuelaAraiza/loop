@@ -7,24 +7,24 @@ struct MainTabView: View {
     @State private var showCelebration = false
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Group {
-                switch selected {
-                case .home:
-                    HomeView(onStartLesson: { showExercise = true })
-                        .environmentObject(appState)
-                case .routes:
-                    RoutesView()
-                        .environmentObject(appState)
-                case .map:
-                    MapView()
-                case .profile:
-                    ProfileView()
-                        .environmentObject(appState)
-                }
+        Group {
+            switch selected {
+            case .home:
+                HomeView(onStartLesson: { showExercise = true })
+                    .environmentObject(appState)
+            case .routes:
+                RoutesView()
+                    .environmentObject(appState)
+            case .map:
+                MapView()
+            case .profile:
+                ProfileView()
+                    .environmentObject(appState)
             }
-
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             BottomNavBar(selected: $selected)
+                .padding(.top, Spacing.xs)
         }
         .fullScreenCover(isPresented: $showExercise) {
             ExerciseView(
@@ -32,7 +32,6 @@ struct MainTabView: View {
                 onCompleted: {
                     showExercise = false
                     showCelebration = true
-                    appState.refreshTodayLesson()
                 },
                 onClose: {
                     showExercise = false
@@ -44,6 +43,7 @@ struct MainTabView: View {
             CelebrationView {
                 showCelebration = false
             }
+            .environmentObject(appState)
         }
         .onAppear {
             appState.refreshTodayLesson()
@@ -68,7 +68,7 @@ private struct ProfileView: View {
                                 Text(LoopCopy.profileTitle(junior: isJuniorMode))
                                     .font(LoopFont.black(28))
                                     .foregroundColor(.textPrimary)
-                                Text("Tu tarjeta vive aqui. Tocala para girarla, arrastrarla y abre ajustes desde Editar.")
+                                Text("Tu tarjeta vive aquí. Tócala para girarla, arrastrarla y abre ajustes desde Editar.")
                                     .font(LoopFont.regular(13))
                                     .foregroundColor(.textSecond)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -168,7 +168,7 @@ private struct ProfileView: View {
         let displayName = name.isEmpty ? "Loop Learner" : name
         let language = appState.userProfile.generatedPlan?.language.rawValue ?? "Python"
         let goal = LoopCopy.goalName(appState.userProfile.goal, junior: isJuniorMode).lowercased()
-        return "\(displayName) esta en ruta de \(goal), practicando \(appState.userProfile.minutesPerDay) minutos por sesion en \(language)."
+        return "\(displayName) está en ruta de \(goal), practicando \(appState.userProfile.minutesPerDay) minutos por sesión en \(language)."
     }
 }
 

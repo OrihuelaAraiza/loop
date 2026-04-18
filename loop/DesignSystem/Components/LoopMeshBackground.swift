@@ -2,12 +2,13 @@ import SwiftUI
 
 struct LoopMeshBackground: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.loopCloudMotionEnabled) private var cloudMotionEnabled
 
     var body: some View {
         ZStack {
             Group {
                 if #available(iOS 18, *) {
-                    if reduceMotion {
+                    if reduceMotion || !cloudMotionEnabled {
                         staticMesh
                     } else {
                         animatedMesh

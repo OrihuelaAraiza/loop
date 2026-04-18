@@ -2,7 +2,6 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var viewModel = HomeViewModel()
     @State private var revealCards = false
 
     var onStartLesson: () -> Void = {}
@@ -14,7 +13,7 @@ struct HomeView: View {
 
     private var lessonSubtitle: String {
         if appState.isLoadingTodayLesson {
-            return "Cargando tu leccion personalizada..."
+            return "Cargando tu lección personalizada..."
         }
 
         if let lesson = appState.todayLesson {
@@ -25,7 +24,37 @@ struct HomeView: View {
             return "Estamos preparando tu ruta de aprendizaje."
         }
 
-        return "Empieza tu practica de hoy"
+        return "Empieza tu práctica de hoy"
+    }
+
+    private var totalLessons: Int {
+        max(appState.currentCourse?.totalLessons ?? 0, 0)
+    }
+
+    private var readyLessons: Int {
+        min(appState.currentCourse?.resolvedReadyLessons ?? 0, max(totalLessons, 0))
+    }
+
+    private var courseProgress: Double {
+        guard totalLessons > 0 else { return 0 }
+        return min(max(Double(readyLessons) / Double(totalLessons), 0), 1)
+    }
+
+    private var weeklyStates: [DayNode.DayState] {
+        let dayCount = dayLabels.count
+        guard dayCount > 0 else { return [] }
+
+        let todayIndex = ((Calendar.current.component(.weekday, from: Date()) + 5) % 7)
+        let completedCount = max(min(appState.gameState.currentStreak - 1, dayCount - 1), 0)
+
+        return dayLabels.indices.map { index in
+            if index == todayIndex {
+                return .today
+            }
+
+            let distanceFromToday = (todayIndex - index + dayCount) % dayCount
+            return distanceFromToday > 0 && distanceFromToday <= completedCount ? .done : .pending
+        }
     }
 
     var body: some View {
@@ -78,7 +107,7 @@ struct HomeView: View {
         LoopCard(accentColor: .amethyst, showsSceneAccent: true, usesGlassSurface: true) {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 HStack {
-                    homePill(icon: "sparkles", text: "Mentor del dia")
+                    homePill(icon: "sparkles", text: "Mentor del día")
                     Spacer()
                     Text("Racha \(appState.gameState.currentStreak)")
                         .font(LoopFont.bold(12))
@@ -91,8 +120,8 @@ struct HomeView: View {
                         .frame(width: 72, height: 72)
                         .clipped()
                     LoopySpeechBubble(
-                        primary: "Hola \(learnerName), llevas \(appState.gameState.currentStreak) dias seguidos.",
-                        secondary: appState.todayLesson == nil ? "Estamos preparando una leccion para ti." : "Tu leccion del dia esta lista, cuando quieras empezar."
+                        primary: "Hola \(learnerName), llevas \(appState.gameState.currentStreak) días seguidos.",
+                        secondary: appState.todayLesson == nil ? "Estamos preparando una lección para ti." : "Tu lección del día está lista, cuando quieras empezar."
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -113,7 +142,7 @@ struct HomeView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Leccion del dia")
+                    Text("Lección del día")
                         .font(LoopFont.bold(17))
                         .foregroundColor(.textPrimary)
                     Text(lessonSubtitle)
@@ -143,7 +172,7 @@ struct HomeView: View {
         }
         .accessibilityElement(children: AccessibilityChildBehavior.combine)
         .accessibilityAddTraits(.isButton)
-        .accessibilityLabel("Empezar leccion del dia")
+        .accessibilityLabel("Empezar lección del día")
     }
 
     private var streakTracker: some View {
@@ -160,7 +189,7 @@ struct HomeView: View {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.loopGold)
-                        Text("\(appState.gameState.currentStreak) dias")
+                        Text("\(appState.gameState.currentStreak) días")
                             .font(LoopFont.bold(16))
                             .foregroundColor(.loopGold)
                     }
@@ -169,7 +198,7 @@ struct HomeView: View {
 
                 HStack(spacing: Spacing.xs) {
                     ForEach(Array(dayLabels.enumerated()), id: \.offset) { idx, label in
-                        DayNode(label: label, state: viewModel.weeklyStates[idx])
+                        DayNode(label: label, state: weeklyStates[idx])
                             .frame(maxWidth: .infinity)
                     }
                 }
@@ -201,7 +230,7 @@ struct HomeView: View {
 
                 LoopProgressBar(progress: safeDailyGoalProgress, height: 12)
 
-                Text("Con una sesion mas completas el objetivo del dia.")
+                Text("Con una sesión más completas el objetivo del día.")
                     .font(LoopFont.regular(12))
                     .foregroundColor(.textSecond)
                     .fixedSize(horizontal: false, vertical: true)
@@ -216,13 +245,13 @@ struct HomeView: View {
             HStack(spacing: Spacing.md) {
                 ProgressMetricCard(
                     title: "Completado",
-                    value: "56%",
+                    value: totalLessons > 0 ? "\(Int(courseProgress * 100))%" : "--",
                     icon: "chart.pie.fill",
                     tint: .mint
                 )
                 ProgressMetricCard(
                     title: "Lecciones",
-                    value: "21/23",
+                    value: totalLessons > 0 ? "\(readyLessons)/\(totalLessons)" : "--",
                     icon: "book.fill",
                     tint: .periwinkle
                 )
@@ -231,13 +260,13 @@ struct HomeView: View {
             VStack(spacing: Spacing.md) {
                 ProgressMetricCard(
                     title: "Completado",
-                    value: "56%",
+                    value: totalLessons > 0 ? "\(Int(courseProgress * 100))%" : "--",
                     icon: "chart.pie.fill",
                     tint: .mint
                 )
                 ProgressMetricCard(
                     title: "Lecciones",
-                    value: "21/23",
+                    value: totalLessons > 0 ? "\(readyLessons)/\(totalLessons)" : "--",
                     icon: "book.fill",
                     tint: .periwinkle
                 )

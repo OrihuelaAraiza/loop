@@ -85,6 +85,5 @@ struct BottomNavBar: View {
         )
         .shadow(color: Color.black.opacity(0.24), radius: 20, y: 14)
         .padding(.horizontal, Spacing.lg)
-        .padding(.bottom, Spacing.lg)
     }
 }

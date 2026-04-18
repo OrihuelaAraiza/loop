@@ -113,14 +113,14 @@ struct LoopIdentityCard: View {
 
                 ViewThatFits(in: .vertical) {
                     HStack(spacing: Spacing.sm) {
-                        statPill(icon: "flame.fill", text: "\(gameState.currentStreak) dias")
+                        statPill(icon: "flame.fill", text: "\(gameState.currentStreak) días")
                         statPill(icon: "clock.fill", text: "\(userProfile.minutesPerDay) min")
                         statPill(icon: "sparkles", text: languageLabel)
                     }
 
                     VStack(alignment: .leading, spacing: Spacing.sm) {
                         HStack(spacing: Spacing.sm) {
-                            statPill(icon: "flame.fill", text: "\(gameState.currentStreak) dias")
+                            statPill(icon: "flame.fill", text: "\(gameState.currentStreak) días")
                             statPill(icon: "clock.fill", text: "\(userProfile.minutesPerDay) min")
                         }
                         statPill(icon: "sparkles", text: languageLabel)
@@ -182,7 +182,7 @@ struct LoopIdentityCard: View {
                     HStack(spacing: Spacing.sm) {
                         xpCell
                         progressCell(value: "Nivel \(gameState.level)", label: "Estado")
-                        progressCell(value: "\(activeDaysCount)", label: "Dias")
+                        progressCell(value: "\(activeDaysCount)", label: "Días")
                     }
 
                     VStack(spacing: Spacing.sm) {
@@ -190,7 +190,7 @@ struct LoopIdentityCard: View {
                             xpCell
                             progressCell(value: "Nivel \(gameState.level)", label: "Estado")
                         }
-                        progressCell(value: "\(activeDaysCount)", label: "Dias")
+                        progressCell(value: "\(activeDaysCount)", label: "Días")
                     }
                 }
 
@@ -206,12 +206,12 @@ struct LoopIdentityCard: View {
 
                 ViewThatFits(in: .vertical) {
                     HStack(spacing: Spacing.sm) {
-                        infoTile(label: "Edad", value: "\(userProfile.age) anos")
+                        infoTile(label: "Edad", value: "\(userProfile.age) años")
                         infoTile(label: "Ruta", value: languageLabel)
                     }
 
                     VStack(spacing: Spacing.sm) {
-                        infoTile(label: "Edad", value: "\(userProfile.age) anos")
+                        infoTile(label: "Edad", value: "\(userProfile.age) años")
                         infoTile(label: "Ruta", value: languageLabel)
                     }
                 }
@@ -500,13 +500,13 @@ struct LoopIdentityCard: View {
     private var identitySubtitle: String {
         switch userProfile.knowledgeLevel {
         case .zero:
-            return "Arrancando desde cero con una ruta clara y sin friccion."
+            return "Arrancando desde cero con una ruta clara y sin fricción."
         case .someReading:
-            return "Con base previa ligera, listo para convertir lectura en practica."
+            return "Con base previa ligera, listo para convertir lectura en práctica."
         case .basicKnows:
             return "Ya dominas la base y ahora toca consolidar ritmo real."
         case .hasPractice:
-            return "Tu enfoque ya es practico; ahora el salto es consistencia y profundidad."
+            return "Tu enfoque ya es práctico; ahora el salto es consistencia y profundidad."
         }
     }
 
@@ -519,7 +519,7 @@ struct LoopIdentityCard: View {
     }
 
     private var backSummary: String {
-        "Estas construyendo una identidad de \(identityTitle.lowercased()) con badge \(displayBadge.rawValue.lowercased()), \(userProfile.minutesPerDay) minutos por sesion y una racha de \(gameState.currentStreak) dias."
+        "Estás construyendo una identidad de \(identityTitle.lowercased()) con badge \(displayBadge.rawValue.lowercased()), \(userProfile.minutesPerDay) minutos por sesión y una racha de \(gameState.currentStreak) días."
     }
 
     private var displayBadge: IdentityCardBadge {
@@ -528,7 +528,7 @@ struct LoopIdentityCard: View {
 
     private var cardInteractionHint: String {
         if userProfile.cardDragEnabled {
-            return "Toca para girarla. Arrastra con el dedo y vera la inclinacion reaccionar."
+            return "Toca para girarla. Arrastra con el dedo y verá la inclinación reaccionar."
         }
         return "Toca la tarjeta para ver tu snapshot actual."
     }

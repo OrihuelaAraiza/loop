@@ -11,7 +11,7 @@ struct PlanGeneratingOverlay: View {
 
     private let steps = [
         "Analizando tus respuestas",
-        "Ajustando modulos iniciales",
+        "Ajustando módulos iniciales",
         "Calibrando tu ritmo",
         "Armando tu plan"
     ]

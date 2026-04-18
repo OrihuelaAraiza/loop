@@ -1,9 +1,9 @@
-import Pow
 import SwiftUI
 import AuthenticationServices
 
 struct AuthView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.loopCloudMotionEnabled) private var cloudMotionEnabled
     @StateObject private var auth = AppleAuthService()
     @State private var showMockConfirm = false
     @State private var showCredentialsFlow = false
@@ -50,14 +50,16 @@ struct AuthView: View {
                 withAnimation(LoopAnimation.meshBreath) {
                     heroPulse = true
                 }
-                withAnimation(.easeInOut(duration: 7.0).repeatForever(autoreverses: true)) {
-                    blob1 = true
-                }
-                withAnimation(.easeInOut(duration: 9.5).repeatForever(autoreverses: true).delay(1.2)) {
-                    blob2 = true
-                }
-                withAnimation(.easeInOut(duration: 6.0).repeatForever(autoreverses: true).delay(2.8)) {
-                    blob3 = true
+                if cloudMotionEnabled {
+                    withAnimation(.easeInOut(duration: 7.0).repeatForever(autoreverses: true)) {
+                        blob1 = true
+                    }
+                    withAnimation(.easeInOut(duration: 9.5).repeatForever(autoreverses: true).delay(1.2)) {
+                        blob2 = true
+                    }
+                    withAnimation(.easeInOut(duration: 6.0).repeatForever(autoreverses: true).delay(2.8)) {
+                        blob3 = true
+                    }
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
@@ -68,7 +70,7 @@ struct AuthView: View {
             Button("Continuar") { auth.mockSignIn() }
             Button("Cancelar", role: .cancel) {}
         } message: {
-            Text("Entraras con una cuenta invitada. Tu progreso se guarda localmente en este dispositivo.")
+            Text("Entrarás con una cuenta invitada. Tu progreso se guarda localmente en este dispositivo.")
         }
         .sheet(isPresented: $showCredentialsFlow) {
             CredentialsAuthSheet(mode: credentialsMode, auth: auth)
@@ -194,7 +196,7 @@ struct AuthView: View {
                 Group {
                     if benefitsReveal {
                         benefitPill(icon: item.icon, label: item.label, tint: item.tint)
-                            .transition(.movingParts.pop)
+                            .transition(.scale(scale: 0.92).combined(with: .opacity))
                     }
                 }
                 .animation(LoopAnimation.springBouncy.delay(0.1 * Double(index)), value: benefitsReveal)
@@ -260,10 +262,10 @@ struct AuthView: View {
                 .clipShape(Capsule())
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Inicia sesion")
+                    Text("Inicia sesión")
                         .font(LoopFont.bold(20))
                         .foregroundColor(.textPrimary)
-                    Text("Primero elige como quieres entrar. Correo y Apple guardan tu progreso en backend.")
+                    Text("Primero elige cómo quieres entrar. Correo y Apple guardan tu progreso en backend.")
                         .font(LoopFont.regular(13))
                         .foregroundColor(.textSecond)
                         .fixedSize(horizontal: false, vertical: true)
@@ -277,7 +279,7 @@ struct AuthView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "person.fill")
                             .font(.system(size: 13, weight: .bold))
-                        Text("Iniciar sesion")
+                        Text("Iniciar sesión")
                             .font(LoopFont.bold(14))
                     }
                     .foregroundColor(.white)
@@ -375,7 +377,7 @@ struct AuthView: View {
             Text("Hecho para aprender a tu ritmo.")
                 .font(LoopFont.bold(12))
                 .foregroundColor(.textSecond)
-            Text("Al continuar aceptas nuestros terminos y la politica de privacidad.")
+            Text("Al continuar aceptas nuestros términos y la política de privacidad.")
                 .font(LoopFont.regular(11))
                 .foregroundColor(.textMuted)
                 .multilineTextAlignment(.center)
@@ -392,7 +394,7 @@ private enum CredentialsMode: String, CaseIterable {
     var title: String {
         switch self {
         case .login:
-            return "Iniciar sesion"
+            return "Iniciar sesión"
         case .register:
             return "Crear cuenta"
         }
@@ -436,7 +438,7 @@ private struct CredentialsAuthSheet: View {
                         .autocorrectionDisabled(true)
                         .textFieldStyle(.roundedBorder)
 
-                    SecureField("Contrasena (min 12)", text: $password)
+                    SecureField("Contraseña (mín. 12)", text: $password)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled(true)
                         .textFieldStyle(.roundedBorder)

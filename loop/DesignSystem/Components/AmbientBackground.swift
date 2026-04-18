@@ -3,6 +3,7 @@ import SwiftUI
 struct AmbientBackground: View {
     var topColor: Color = .amethyst
     var bottomColor: Color = .cerulean
+    @Environment(\.loopCloudMotionEnabled) private var cloudMotionEnabled
     @State private var drift = false
 
     var body: some View {
@@ -42,6 +43,7 @@ struct AmbientBackground: View {
             .ignoresSafeArea()
         }
         .onAppear {
+            guard cloudMotionEnabled else { return }
             withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) {
                 drift.toggle()
             }

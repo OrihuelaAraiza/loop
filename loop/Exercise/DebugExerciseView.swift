@@ -64,8 +64,8 @@ struct DebugExerciseView: View {
                         .foregroundColor(.coral)
                         .font(.system(size: 13))
                     Text(isJuniorMode
-                         ? "Seleccionaste la linea \(selectedLine + 1)"
-                         : "Linea \(selectedLine + 1) seleccionada")
+                         ? "Seleccionaste la línea \(selectedLine + 1)"
+                         : "Línea \(selectedLine + 1) seleccionada")
                         .font(LoopFont.semiBold(13))
                         .foregroundColor(.coral)
                 }

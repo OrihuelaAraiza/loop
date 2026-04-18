@@ -13,6 +13,7 @@ struct SettingsSheet: View {
 
     @State private var showSignOutConfirm = false
     @State private var showResetConfirm = false
+    @State private var showNukeResetConfirm = false
 
     var body: some View {
         ZStack {
@@ -32,14 +33,14 @@ struct SettingsSheet: View {
                 .padding(.bottom, Spacing.xl)
             }
         }
-        .alert("Cerrar sesion", isPresented: $showSignOutConfirm) {
-            Button("Cerrar sesion", role: .destructive) {
+        .alert("Cerrar sesión", isPresented: $showSignOutConfirm) {
+            Button("Cerrar sesión", role: .destructive) {
                 appState.signOut()
                 dismiss()
             }
             Button("Cancelar", role: .cancel) {}
         } message: {
-            Text("Volveras a la pantalla de inicio de sesion. Tu progreso local se mantiene guardado.")
+            Text("Volverás a la pantalla de inicio de sesión. Tu progreso local se mantiene guardado.")
         }
         .alert("Reiniciar onboarding", isPresented: $showResetConfirm) {
             Button("Reiniciar", role: .destructive) {
@@ -48,7 +49,16 @@ struct SettingsSheet: View {
             }
             Button("Cancelar", role: .cancel) {}
         } message: {
-            Text("Se borrara tu perfil, racha y XP local, y volveras al flujo de onboarding. Util para pruebas.")
+            Text("Se borrará tu perfil, racha y XP local, y volverás al flujo de onboarding. Útil para pruebas.")
+        }
+        .alert("Reset completo (Dev)", isPresented: $showNukeResetConfirm) {
+            Button("Borrar todo", role: .destructive) {
+                appState.resetForTesting()
+                dismiss()
+            }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Borra UserDefaults, sesión backend, widget y estado en memoria. Usar solo para pruebas.")
         }
         .onAppear {
             if juniorMode.isActive {
@@ -95,7 +105,7 @@ struct SettingsSheet: View {
                 divider
                 infoRow(label: "Email", value: appState.authSession?.email ?? "Sin correo")
                 divider
-                infoRow(label: "Metodo", value: providerLabel)
+                infoRow(label: "Método", value: providerLabel)
                 divider
                 infoRow(label: "ID", value: shortID)
             }
@@ -111,9 +121,9 @@ struct SettingsSheet: View {
     private var providerLabel: String {
         switch appState.authSession?.provider {
         case .apple: return "Apple ID"
-        case .password: return "Email y contrasena"
+        case .password: return "Email y contraseña"
         case .mockApple: return "Modo demo"
-        case .none: return "Sin sesion"
+        case .none: return "Sin sesión"
         }
     }
 
@@ -128,7 +138,7 @@ struct SettingsSheet: View {
         settingsCard(title: "Aprendizaje", icon: "graduationcap.fill", tint: .mint) {
             VStack(spacing: Spacing.sm) {
                 stepperRow(
-                    label: "Minutos por sesion",
+                    label: "Minutos por sesión",
                     value: appState.userProfile.minutesPerDay,
                     range: 5 ... 60,
                     step: 5,
@@ -151,7 +161,7 @@ struct SettingsSheet: View {
                 divider
                 toggleRow(
                     title: "Modo Junior",
-                    subtitle: "Adapta copy y presentacion para perfiles menores de 13.",
+                    subtitle: "Adapta copy y presentación para perfiles menores de 13.",
                     isOn: Binding(
                         get: { juniorMode.isActive },
                         set: { newValue in
@@ -171,7 +181,7 @@ struct SettingsSheet: View {
 
     private var activeDaysRow: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
-            Text("Dias activos")
+            Text("Días activos")
                 .font(LoopFont.semiBold(13))
                 .foregroundColor(.textSecond)
 
@@ -220,11 +230,11 @@ struct SettingsSheet: View {
                 divider
                 toggleRow(title: "Sonido", subtitle: "Efectos al completar lecciones.", isOn: $soundEnabled)
                 divider
-                toggleRow(title: "Vibracion", subtitle: "Feedback haptico en interacciones.", isOn: $hapticsEnabled)
+                toggleRow(title: "Vibración", subtitle: "Feedback háptico en interacciones.", isOn: $hapticsEnabled)
                 divider
                 toggleRow(title: "Reducir movimiento", subtitle: "Minimiza animaciones y parallax.", isOn: $reduceMotion)
                 divider
-                toggleRow(title: "Compartir analiticas", subtitle: "Ayuda a mejorar Loop de forma anonima.", isOn: $analyticsEnabled)
+                toggleRow(title: "Compartir analíticas", subtitle: "Ayuda a mejorar Loop de forma anónima.", isOn: $analyticsEnabled)
             }
         }
     }
@@ -235,8 +245,8 @@ struct SettingsSheet: View {
         settingsCard(title: "Cuenta y pruebas", icon: "exclamationmark.shield.fill", tint: .coral) {
             VStack(spacing: Spacing.sm) {
                 actionRow(
-                    title: "Cerrar sesion",
-                    subtitle: "Volveras a la pantalla de inicio de sesion.",
+                    title: "Cerrar sesión",
+                    subtitle: "Volverás a la pantalla de inicio de sesión.",
                     icon: "rectangle.portrait.and.arrow.right",
                     tint: .coral
                 ) {
@@ -253,6 +263,19 @@ struct SettingsSheet: View {
                 ) {
                     showResetConfirm = true
                 }
+
+                #if DEBUG
+                divider
+
+                actionRow(
+                    title: "Reset completo (Dev)",
+                    subtitle: "Borra sesión, UserDefaults, widget y estado. Solo para pruebas.",
+                    icon: "trash.circle.fill",
+                    tint: .coral
+                ) {
+                    showNukeResetConfirm = true
+                }
+                #endif
             }
         }
     }
@@ -262,7 +285,7 @@ struct SettingsSheet: View {
             Text("loop")
                 .font(LoopFont.black(16))
                 .foregroundColor(.textPrimary)
-            Text("Version 0.1 · Build interno")
+            Text("Versión 0.1 · Build interno")
                 .font(LoopFont.regular(11))
                 .foregroundColor(.textMuted)
         }

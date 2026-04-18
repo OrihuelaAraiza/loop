@@ -3,19 +3,19 @@ import SwiftUI
 import UIKit
 
 /// Toasts globales de Loop. El sistema de haptics existente (HapticManager)
-/// se encarga del feedback tactil; SPAlert siempre con haptic: .none.
+    /// se encarga del feedback táctil; SPAlert siempre con haptic: .none.
 enum LoopToast {
     static func xpGained(_ amount: Int) {
         present(
             title: "+\(amount) XP",
-            message: "Sigue asi",
+            message: "Sigue así",
             image: UIImage(systemName: "star.fill")
         )
     }
 
     static func streakSaved(days: Int) {
         present(
-            title: "Racha: \(days) dias",
+            title: "Racha: \(days) días",
             message: "No pares ahora",
             image: UIImage(systemName: "flame.fill")
         )
@@ -24,7 +24,7 @@ enum LoopToast {
     static func planReady() {
         SPAlert.present(
             title: "Plan listo",
-            message: "Tu ruta esta generada",
+            message: "Tu ruta está generada",
             preset: .done,
             haptic: .none
         )
@@ -32,7 +32,7 @@ enum LoopToast {
 
     static func lessonComplete(xp: Int) {
         SPAlert.present(
-            title: "Leccion completa",
+            title: "Lección completa",
             message: "+\(xp) XP ganados",
             preset: .done,
             haptic: .none
@@ -41,7 +41,7 @@ enum LoopToast {
 
     static func error(_ message: String) {
         SPAlert.present(
-            title: "Algo salio mal",
+            title: "Algo salió mal",
             message: message,
             preset: .error,
             haptic: .none

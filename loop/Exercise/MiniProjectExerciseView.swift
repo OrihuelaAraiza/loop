@@ -29,7 +29,7 @@ struct MiniProjectExerciseView: View {
                 Text(isJuniorMode ? "Tu turno de crear" : "Mini proyecto")
                     .font(LoopFont.bold(14))
                     .foregroundColor(.textPrimary)
-                Text(isJuniorMode ? "Escribe tu codigo y toca Verificar" : "Escribe el codigo y presiona Verificar")
+                Text(isJuniorMode ? "Escribe tu código y toca Verificar" : "Escribe el código y presiona Verificar")
                     .font(LoopFont.regular(12))
                     .foregroundColor(.textSecond)
             }
@@ -121,7 +121,7 @@ struct MiniProjectExerciseView: View {
                     .foregroundColor(.textMuted)
             }
 
-            Text(isJuniorMode ? "Aqui veras el resultado cuando termines" : "El resultado aparecera al verificar")
+            Text(isJuniorMode ? "Aquí verás el resultado cuando termines" : "El resultado aparecerá al verificar")
                 .font(.system(size: 13, design: .monospaced))
                 .foregroundColor(.textMuted)
                 .padding(12)
