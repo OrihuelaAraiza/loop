@@ -11,7 +11,7 @@ final class AppState: ObservableObject {
     }
 
     @Published var gameState = GameState() {
-        didSet { bindGameState() }
+        didSet { persistGameState() }
     }
 
     @Published var authSession: AuthSession? {
@@ -29,11 +29,9 @@ final class AppState: ObservableObject {
     private let gameKey = "loop.gameState"
     private let onboardingKey = "loop.hasCompletedOnboarding"
     private let authKey = "loop.authSession"
-    private var cancellables = Set<AnyCancellable>()
 
     init() {
         loadFromStorage()
-        bindGameState()
     }
 
     var isSignedIn: Bool { authSession != nil }
@@ -46,23 +44,7 @@ final class AppState: ObservableObject {
         }
         hasCompletedOnboarding = false
         userProfile = UserProfile()
-        gameState.apply(GameStateSnapshot(
-            currentStreak: 0,
-            totalXP: 0,
-            level: 1,
-            hearts: 3,
-            dailyXP: 0,
-            dailyGoal: gameState.dailyGoal,
-            completedLessons: [],
-            earnedBadges: []
-        ))
         authSession = nil
-        currentCourse = nil
-        todayLesson = nil
-        isGeneratingCourse = false
-        isLoadingTodayLesson = false
-        lastLessonCompletion = nil
-        courseSyncErrorMessage = nil
     }
 
     func completeSignIn(with session: AuthSession) {
@@ -119,6 +101,8 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Completes a lesson on the backend and refreshes local state.
+    /// Used from ExerciseView when the user finishes the full exercise sequence.
     func completeLesson(lessonID: String, lessonTitle: String?) async {
         guard let token = authSession?.apiToken else { return }
 
@@ -126,20 +110,58 @@ final class AppState: ObservableObject {
             let response = try await OnboardingAPIClient().completeLesson(token: token, lessonID: lessonID)
 
             await MainActor.run {
-                applyLessonCompletion(response, lessonID: lessonID, lessonTitle: lessonTitle)
-                courseSyncErrorMessage = nil
+                self.lastLessonCompletion = LessonCompletionSummary(
+                    lessonID: lessonID,
+                    lessonTitle: lessonTitle,
+                    xpGained: response.xpGained,
+                    heartsRemaining: response.heartsRemaining,
+                    completedAt: Date()
+                )
             }
 
             await ensureCourseAndLessonLoaded()
         } catch {
-            await MainActor.run {
-                courseSyncErrorMessage = "No pudimos sincronizar la lección con el backend."
-                LoopToast.error("No pudimos sincronizar la lección con el backend.")
-            }
+            // Silently fail; UI still advances with locally-known XP estimate.
         }
     }
 
-    /// Cierra la sesión y limpia todo el progreso local para probar el flujo completo de nuevo.
+    /// Borra absolutamente todo el estado local (defaults, sesión, widget, memoria).
+    /// Usar solo para pruebas de dev.
+    func resetForTesting() {
+        if let token = authSession?.apiToken {
+            Task {
+                try? await OnboardingAPIClient().logout(token: token)
+            }
+        }
+
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: profileKey)
+        defaults.removeObject(forKey: gameKey)
+        defaults.removeObject(forKey: onboardingKey)
+        defaults.removeObject(forKey: authKey)
+
+        hasCompletedOnboarding = false
+        userProfile = UserProfile()
+        gameState.apply(GameStateSnapshot(
+            currentStreak: 0,
+            totalXP: 0,
+            level: 1,
+            hearts: 3,
+            dailyXP: 0,
+            dailyGoal: 20,
+            completedLessons: [],
+            earnedBadges: []
+        ))
+        currentCourse = nil
+        todayLesson = nil
+        isGeneratingCourse = false
+        isLoadingTodayLesson = false
+        courseSyncErrorMessage = nil
+        lastLessonCompletion = nil
+        authSession = nil
+    }
+
+    /// Cierra la sesion y limpia todo el progreso local para probar el flujo completo de nuevo.
     func resetForOnboarding() {
         hasCompletedOnboarding = false
         userProfile = UserProfile()
@@ -155,67 +177,6 @@ final class AppState: ObservableObject {
         ))
         persistGameState()
         authSession = nil
-        lastLessonCompletion = nil
-        courseSyncErrorMessage = nil
-    }
-
-    /// Reset nuclear para QA/Debug: borra TODO el estado local y de sesión.
-    /// - Logout backend (si hay token)
-    /// - Borra UserDefaults (app + app group del widget)
-    /// - Resetea JuniorMode
-    /// - Limpia curso / lección / flags en memoria
-    func resetForTesting() {
-        if let token = authSession?.apiToken {
-            Task {
-                try? await OnboardingAPIClient().logout(token: token)
-            }
-        }
-
-        let defaults = UserDefaults.standard
-        for key in [profileKey, gameKey, onboardingKey, authKey, "loop.juniorMode"] {
-            defaults.removeObject(forKey: key)
-        }
-
-        if let group = UserDefaults(suiteName: "group.com.loop.shared") {
-            for key in ["loop.widget.streak", "loop.widget.dailyXP", "loop.widget.targetXP", "loop.widget.userName"] {
-                group.removeObject(forKey: key)
-            }
-        }
-
-        JuniorModeManager.shared.isActive = false
-
-        hasCompletedOnboarding = false
-        userProfile = UserProfile()
-        gameState.apply(GameStateSnapshot(
-            currentStreak: 0,
-            totalXP: 0,
-            level: 1,
-            hearts: 3,
-            dailyXP: 0,
-            dailyGoal: 20,
-            completedLessons: [],
-            earnedBadges: []
-        ))
-        persistGameState()
-        authSession = nil
-        currentCourse = nil
-        todayLesson = nil
-        isGeneratingCourse = false
-        isLoadingTodayLesson = false
-        lastLessonCompletion = nil
-        courseSyncErrorMessage = nil
-    }
-
-    private func bindGameState() {
-        cancellables.removeAll()
-
-        gameState.objectWillChange
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-                self?.persistGameState()
-            }
-            .store(in: &cancellables)
     }
 
     private func loadFromStorage() {
@@ -238,27 +199,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    @MainActor
-    private func applyLessonCompletion(
-        _ response: CompleteLessonResponsePayload,
-        lessonID: String,
-        lessonTitle: String?
-    ) {
-        gameState.applyLessonCompletion(
-            lessonID: lessonID,
-            xpGained: response.xpGained,
-            heartsRemaining: response.heartsRemaining
-        )
-
-        lastLessonCompletion = LessonCompletionSummary(
-            lessonID: lessonID,
-            lessonTitle: lessonTitle,
-            xpGained: response.xpGained,
-            heartsRemaining: response.heartsRemaining,
-            completedAt: Date()
-        )
-    }
-
     private func persistFlags() {
         UserDefaults.standard.set(hasCompletedOnboarding, forKey: onboardingKey)
     }
@@ -271,12 +211,6 @@ final class AppState: ObservableObject {
     private func persistGameState() {
         guard let data = try? JSONEncoder().encode(gameState.snapshot()) else { return }
         UserDefaults.standard.set(data, forKey: gameKey)
-        LoopWidgetBridge.write(
-            streak: gameState.currentStreak,
-            dailyXP: gameState.dailyXP,
-            targetXP: gameState.dailyGoal,
-            userName: userProfile.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        )
     }
 
     private func persistAuth() {
@@ -339,7 +273,7 @@ final class AppState: ObservableObject {
         } catch {
             await MainActor.run {
                 self.isLoadingTodayLesson = false
-                self.courseSyncErrorMessage = "No pudimos sincronizar el curso con el backend."
+                self.courseSyncErrorMessage = "No se pudo conectar con el servidor. Intentaremos de nuevo."
             }
         }
     }
@@ -612,6 +546,7 @@ struct CourseStatusPayload: Decodable {
     let language: String
     let totalLessons: Int
     let lessonStatusCounts: [String: Int]
+    let lessons: [LessonSummary]
     let generatedCourseTitle: String?
     let generatedDescription: String?
     let generatedObjectives: [String]
@@ -624,6 +559,7 @@ struct CourseStatusPayload: Decodable {
         case language
         case totalLessons = "total_lessons"
         case lessonStatusCounts = "lesson_status_counts"
+        case lessons
         case generatedCourseTitle = "generated_course_title"
         case generatedDescription = "generated_description"
         case generatedObjectives = "generated_objectives"
@@ -638,10 +574,74 @@ struct CourseStatusPayload: Decodable {
         language = try container.decode(String.self, forKey: .language)
         totalLessons = try container.decode(Int.self, forKey: .totalLessons)
         lessonStatusCounts = try container.decodeIfPresent([String: Int].self, forKey: .lessonStatusCounts) ?? [:]
+        lessons = try container.decodeIfPresent([LessonSummary].self, forKey: .lessons) ?? []
         generatedCourseTitle = try container.decodeIfPresent(String.self, forKey: .generatedCourseTitle)
         generatedDescription = try container.decodeIfPresent(String.self, forKey: .generatedDescription)
         generatedObjectives = try container.decodeIfPresent([String].self, forKey: .generatedObjectives) ?? []
         generatedModulesCount = try container.decodeIfPresent(Int.self, forKey: .generatedModulesCount)
+    }
+
+    // MARK: - Derived UI helpers
+
+    var resolvedTitle: String {
+        if let generated = generatedCourseTitle,
+           !generated.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           generated.lowercased() != "generando curso..." {
+            return generated
+        }
+        if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return title
+        }
+        return "Curso personalizado"
+    }
+
+    var resolvedSummary: String {
+        if let description = generatedDescription,
+           !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return description
+        }
+        if !generatedObjectives.isEmpty {
+            return generatedObjectives.prefix(2).joined(separator: " · ")
+        }
+        switch status {
+        case "draft", "generating":
+            return "Generando tu curso personalizado..."
+        case "ready_first_lesson":
+            return "Tu primera lección está lista. Sigue avanzando."
+        case "ready_full":
+            return "Ruta completa. Avanza módulo por módulo."
+        case "failed":
+            return "Hubo un problema generando el curso. Toca para reintentar."
+        default:
+            return "Tu ruta personalizada de aprendizaje."
+        }
+    }
+
+    var resolvedReadyLessons: Int {
+        if !lessons.isEmpty {
+            return lessons.filter { $0.status == "ready" }.count
+        }
+        return lessonStatusCounts["ready"] ?? 0
+    }
+}
+
+struct LessonSummary: Decodable, Identifiable, Equatable {
+    let id: String
+    let title: String
+    let orderIndex: Int
+    let status: String
+    let estimatedMinutes: Int?
+    let xpReward: Int?
+    let difficulty: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case orderIndex = "order_index"
+        case status
+        case estimatedMinutes = "estimated_minutes"
+        case xpReward = "xp_reward"
+        case difficulty
     }
 }
 
@@ -832,47 +832,10 @@ struct CompleteLessonResponsePayload: Decodable {
     }
 }
 
-struct LessonCompletionSummary {
+struct LessonCompletionSummary: Equatable {
     let lessonID: String
     let lessonTitle: String?
     let xpGained: Int
     let heartsRemaining: Int
     let completedAt: Date
-}
-
-extension CourseStatusPayload {
-    var resolvedTitle: String {
-        let generated = generatedCourseTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !generated.isEmpty { return generated }
-        return title
-    }
-
-    var resolvedSummary: String {
-        let description = generatedDescription?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !description.isEmpty { return description }
-
-        if let objective = generatedObjectives.first?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !objective.isEmpty {
-            return objective
-        }
-
-        return "Curso sincronizado desde el backend."
-    }
-
-    var resolvedReadyLessons: Int {
-        let ready = lessonStatusCounts["ready"] ?? 0
-        let completed = lessonStatusCounts["completed"] ?? 0
-        let done = lessonStatusCounts["done"] ?? 0
-        return max(ready + completed + done, 0)
-    }
-
-    var resolvedCompletedLessons: Int {
-        let completed = lessonStatusCounts["completed"] ?? 0
-        let done = lessonStatusCounts["done"] ?? 0
-        return max(completed + done, 0)
-    }
-
-    var resolvedReadyOnlyLessons: Int {
-        max((lessonStatusCounts["ready"] ?? 0), 0)
-    }
 }

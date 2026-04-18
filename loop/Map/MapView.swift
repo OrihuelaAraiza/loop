@@ -1,5 +1,5 @@
-import SwiftUI
 import Combine
+import SwiftUI
 
 enum RoadmapNodeState {
     case completed
@@ -8,7 +8,7 @@ enum RoadmapNodeState {
 }
 
 struct RoadmapNode: Identifiable {
-    let id: String
+    let id = UUID()
     let order: Int
     let title: String
     let icon: String
@@ -88,6 +88,7 @@ struct MapView: View {
                 lesson: lesson,
                 onCompleted: {
                     practiceLesson = nil
+                    appState.refreshTodayLesson()
                 },
                 onClose: {
                     practiceLesson = nil
@@ -107,45 +108,21 @@ struct MapView: View {
     }
 
     private var courseTitle: String {
-        appState.currentCourse?.resolvedTitle ??
+        appState.currentCourse?.generatedCourseTitle ??
+            appState.currentCourse?.title ??
             "Generando curso..."
     }
 
     private var totalLessons: Int {
-        max(rawTotalLessons, rawReadyLessons, todayOrderIndex ?? 0, 0)
-    }
-
-    private var rawTotalLessons: Int {
-        max(appState.currentCourse?.totalLessons ?? 0, 0)
-    }
-
-    private var rawReadyLessons: Int {
-        appState.currentCourse?.resolvedReadyLessons ?? 0
-    }
-
-    private var rawCompletedLessons: Int {
-        appState.currentCourse?.resolvedCompletedLessons ?? 0
-    }
-
-    private var rawReadyOnlyLessons: Int {
-        appState.currentCourse?.resolvedReadyOnlyLessons ?? 0
+        max(appState.currentCourse?.totalLessons ?? 1, 1)
     }
 
     private var readyLessons: Int {
-        min(max(rawReadyLessons, 0), max(totalLessons, 0))
-    }
-
-    private var completedLessons: Int {
-        min(max(rawCompletedLessons, 0), max(totalLessons, 0))
-    }
-
-    private var readyOnlyLessons: Int {
-        min(max(rawReadyOnlyLessons, 0), max(totalLessons - completedLessons, 0))
+        appState.currentCourse?.lessonStatusCounts["ready"] ?? 0
     }
 
     private var routeProgress: Double {
-        guard totalLessons > 0 else { return 0 }
-        return min(max(Double(readyLessons) / Double(totalLessons), 0), 1)
+        min(max(Double(readyLessons) / Double(max(totalLessons, 1)), 0), 1)
     }
 
     private var generatedDescription: String {
@@ -155,109 +132,74 @@ struct MapView: View {
         }
 
         if isStillGenerating {
-            return "Tu ruta se va construyendo en vivo. Apenas se genera una lección, se desbloquea aquí."
+            return "Tu ruta se va construyendo en vivo. Apenas se genera una leccion, se desbloquea aqui."
         }
 
-        return "Ruta lista. Avanza teoría + práctica para desbloquear nuevas lecciones."
+        return "Ruta lista. Avanza teoria + practica para desbloquear nuevas lecciones."
     }
 
     private var todayOrderIndex: Int? {
-        guard let order = appState.todayLesson?.orderIndex else { return nil }
-        return max(order, 1)
-    }
-
-    private var activeRoadmapOrder: Int? {
-        if let todayOrderIndex {
-            return min(max(todayOrderIndex, 1), totalLessons)
-        }
-
-        guard readyOnlyLessons > 0, totalLessons > 0 else { return nil }
-        return min(completedLessons + 1, totalLessons)
-    }
-
-    private var usesReachabilityFallback: Bool {
-        guard let activeOrder = todayOrderIndex, totalLessons > 0 else { return false }
-        let minimumReachableOrder = min(completedLessons + 1, totalLessons)
-        let maximumReachableOrder = min(completedLessons + max(readyOnlyLessons, 1), totalLessons)
-        return activeOrder < minimumReachableOrder || activeOrder > maximumReachableOrder
-    }
-
-    private var hasRoadmapDataIssues: Bool {
-        if totalLessons == 0 {
-            return appState.todayLesson != nil || rawReadyLessons > 0
-        }
-
-        if rawCompletedLessons > rawReadyLessons {
-            return true
-        }
-
-        if rawTotalLessons > 0 && rawReadyLessons > rawTotalLessons {
-            return true
-        }
-
-        if rawTotalLessons > 0 && rawCompletedLessons > rawTotalLessons {
-            return true
-        }
-
-        if let todayOrderIndex, rawTotalLessons > 0, todayOrderIndex > rawTotalLessons {
-            return true
-        }
-
-        if usesReachabilityFallback {
-            return true
-        }
-
-        return false
-    }
-
-    private var roadmapStatusMessage: String? {
-        if let backendError = appState.courseSyncErrorMessage {
-            return backendError
-        }
-
-        if usesReachabilityFallback {
-            return "El backend devolvió una lección activa fuera del progreso confirmado. No marcaremos módulos como completados hasta resincronizar."
-        }
-
-        guard hasRoadmapDataIssues else { return nil }
-        return "El roadmap se está resincronizando con el backend. Mostramos una versión segura mientras llegan todos los nodos."
-    }
-
-    private var roadmapAnimationsEnabled: Bool {
-        !hasRoadmapDataIssues && appState.courseSyncErrorMessage == nil
+        appState.todayLesson?.orderIndex
     }
 
     private var roadmapNodes: [RoadmapNode] {
-        guard totalLessons > 0 else { return [] }
+        let summaries = (appState.currentCourse?.lessons ?? []).sorted { $0.orderIndex < $1.orderIndex }
 
-        let activeOrder = activeRoadmapOrder
-        let readyRangeStart = min(completedLessons + 1, totalLessons)
-        let readyRangeEnd = min(completedLessons + readyOnlyLessons, totalLessons)
-        let canShowReadyRange = readyOnlyLessons > 0 && !usesReachabilityFallback
+        // If backend already sent the real lesson list, use that.
+        if !summaries.isEmpty {
+            return summaries.map { summary in
+                let state: RoadmapNodeState
+                switch summary.status {
+                case "ready":
+                    state = summary.orderIndex == todayOrderIndex ? .active : .active
+                case "failed":
+                    state = .locked
+                default:
+                    state = .locked
+                }
+
+                let isInteractive =
+                    summary.status == "ready" &&
+                    summary.orderIndex == todayOrderIndex &&
+                    appState.todayLesson != nil
+
+                return RoadmapNode(
+                    order: summary.orderIndex,
+                    title: summary.title.isEmpty ? "Leccion \(summary.orderIndex)" : summary.title,
+                    icon: "book.fill",
+                    state: state,
+                    isInteractive: isInteractive
+                )
+            }
+        }
+
+        // Fallback: no lesson list (older server or course not yet built)
+        let activeOrder = todayOrderIndex ?? (readyLessons > 0 ? 1 : nil)
 
         return (1 ... totalLessons).map { index in
             let state: RoadmapNodeState
-            if index <= completedLessons {
-                state = .completed
-            } else if let activeOrder, index == activeOrder {
-                state = .active
-            } else if canShowReadyRange, index >= readyRangeStart, index <= readyRangeEnd {
-                state = .active
+            if let activeOrder {
+                if index < activeOrder {
+                    state = .completed
+                } else if index == activeOrder {
+                    state = .active
+                } else {
+                    state = index <= readyLessons ? .active : .locked
+                }
             } else {
-                state = .locked
+                state = index <= readyLessons ? .active : .locked
             }
 
             let title: String
             if index == todayOrderIndex, let lessonTitle = appState.todayLesson?.title {
                 title = lessonTitle
             } else {
-                title = "Lección \(index)"
+                title = "Leccion \(index)"
             }
 
             let isInteractive = index == todayOrderIndex && appState.todayLesson != nil
 
             return RoadmapNode(
-                id: "lesson-\(index)",
                 order: index,
                 title: title,
                 icon: "book.fill",
@@ -272,7 +214,7 @@ struct MapView: View {
             Text("Mapa")
                 .font(LoopFont.black(30))
                 .foregroundColor(.textPrimary)
-            Text("Tu curso se construye en vivo. Cada nodo desbloquea teoría y luego ejercicios.")
+            Text("Tu curso se construye en vivo. Cada nodo desbloquea teoria y luego ejercicios.")
                 .font(LoopFont.regular(13))
                 .foregroundColor(.textSecond)
                 .fixedSize(horizontal: false, vertical: true)
@@ -327,46 +269,28 @@ struct MapView: View {
                 .textCase(.uppercase)
                 .tracking(0.8)
 
-            if let roadmapStatusMessage {
-                LoopCard(accentColor: .loopGold, usesGlassSurface: true) {
-                    Text(roadmapStatusMessage)
-                        .font(LoopFont.regular(12))
-                        .foregroundColor(.textSecond)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
             LoopCard(accentColor: .clear, usesGlassSurface: true) {
-                if roadmapNodes.isEmpty {
-                    Text(isStillGenerating ? "Estamos esperando el roadmap real del backend." : "Todavía no hay nodos disponibles para este curso.")
-                        .font(LoopFont.regular(13))
-                        .foregroundColor(.textSecond)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, Spacing.sm)
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(Array(roadmapNodes.enumerated()), id: \.element.id) { index, node in
-                            RoadmapRow(
-                                node: node,
-                                tint: .coral,
-                                index: index,
-                                total: roadmapNodes.count,
-                                animationsEnabled: roadmapAnimationsEnabled,
-                                onTap: {
-                                    guard node.isInteractive, let lesson = appState.todayLesson else { return }
-                                    theoryLesson = lesson
-                                }
-                            )
-                            .scaleEffect(reveal ? 1 : 0.96)
-                            .opacity(reveal ? 1 : 0)
-                            .animation(
-                                .spring(response: 0.55, dampingFraction: 0.85).delay(Double(index) * 0.06),
-                                value: reveal
-                            )
-                        }
+                VStack(spacing: 0) {
+                    ForEach(Array(roadmapNodes.enumerated()), id: \.element.id) { index, node in
+                        RoadmapRow(
+                            node: node,
+                            tint: .coral,
+                            index: index,
+                            total: roadmapNodes.count,
+                            onTap: {
+                                guard node.isInteractive, let lesson = appState.todayLesson else { return }
+                                theoryLesson = lesson
+                            }
+                        )
+                        .scaleEffect(reveal ? 1 : 0.96)
+                        .opacity(reveal ? 1 : 0)
+                        .animation(
+                            .spring(response: 0.55, dampingFraction: 0.85).delay(Double(index) * 0.06),
+                            value: reveal
+                        )
                     }
-                    .frame(maxWidth: .infinity)
                 }
+                .frame(maxWidth: .infinity)
             }
         }
     }
@@ -377,7 +301,6 @@ private struct RoadmapRow: View {
     let tint: Color
     let index: Int
     let total: Int
-    let animationsEnabled: Bool
     var onTap: (() -> Void)? = nil
 
     @State private var pulse = false
@@ -410,13 +333,15 @@ private struct RoadmapRow: View {
             }
         }
         .onAppear {
-            updateAnimationState()
-        }
-        .onChange(of: node.state) { _, _ in
-            updateAnimationState()
-        }
-        .onChange(of: animationsEnabled) { _, _ in
-            updateAnimationState()
+            let delay = Double(index) * 0.1
+            withAnimation(.easeOut(duration: 0.9).delay(delay)) {
+                connectorProgress = 1
+            }
+            if node.state == .active, !reduceMotion {
+                withAnimation(LoopAnimation.pulseSlow) {
+                    pulse = true
+                }
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -531,7 +456,7 @@ private struct RoadmapRow: View {
     private var stateLabel: String {
         switch node.state {
         case .completed: return "Completado"
-        case .active: return node.isInteractive ? "Empieza teoría" : "Disponible"
+        case .active: return node.isInteractive ? "Empieza teoria" : "Disponible"
         case .locked: return "Bloqueado"
         }
     }
@@ -541,29 +466,6 @@ private struct RoadmapRow: View {
         case .completed: return .mint
         case .active: return tint
         case .locked: return .textMuted
-        }
-    }
-
-    private func updateAnimationState() {
-        if animationsEnabled {
-            let delay = Double(index) * 0.1
-            connectorProgress = isLast ? 1 : 0
-            if !isLast {
-                withAnimation(.easeOut(duration: 0.9).delay(delay)) {
-                    connectorProgress = 1
-                }
-            }
-
-            if node.state == .active, !reduceMotion {
-                withAnimation(LoopAnimation.pulseSlow) {
-                    pulse = true
-                }
-            } else {
-                pulse = false
-            }
-        } else {
-            connectorProgress = 1
-            pulse = false
         }
     }
 }
