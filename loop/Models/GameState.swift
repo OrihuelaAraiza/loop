@@ -110,9 +110,9 @@ struct GameStateSnapshot: Codable {
         dailyGoal = try container.decodeIfPresent(Int.self, forKey: .dailyGoal) ?? 20
 
         if let stringIDs = try? container.decodeIfPresent(Set<String>.self, forKey: .completedLessons) {
-            completedLessons = stringIDs ?? []
+            completedLessons = stringIDs
         } else if let uuidIDs = try? container.decodeIfPresent(Set<UUID>.self, forKey: .completedLessons) {
-            completedLessons = Set((uuidIDs ?? []).map(\.uuidString))
+            completedLessons = Set(uuidIDs.map(\.uuidString))
         } else {
             completedLessons = []
         }

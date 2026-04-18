@@ -18,13 +18,16 @@ final class ExerciseViewModel: ObservableObject {
     let lessonTitle: String?
     let lessonXPReward: Int?
 
-    init(lesson: LessonPayload? = nil) {
+    init(lesson: LessonPayload? = nil, initialIndex: Int? = nil) {
         self.lessonID = lesson?.id
         self.lessonTitle = lesson?.title
         self.lessonXPReward = lesson?.xpReward
 
         let mapped = lesson.map(Self.buildExercises(from:)) ?? []
         self.exercises = mapped
+        if let initialIndex {
+            self.currentIndex = min(max(initialIndex, 0), max(mapped.count - 1, 0))
+        }
 
         if lesson == nil {
             loadError = "Todavía no hay una lección disponible desde el backend."

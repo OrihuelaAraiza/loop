@@ -11,7 +11,10 @@ final class AppState: ObservableObject {
     }
 
     @Published var gameState = GameState() {
-        didSet { persistGameState() }
+        didSet {
+            observeGameState()
+            persistGameState()
+        }
     }
 
     @Published var authSession: AuthSession? {
@@ -24,14 +27,18 @@ final class AppState: ObservableObject {
     @Published var isLoadingTodayLesson = false
     @Published var courseSyncErrorMessage: String?
     @Published var lastLessonCompletion: LessonCompletionSummary?
+    @Published private(set) var lessonProgressByID: [String: LessonResumeState] = [:]
 
     private let profileKey = "loop.userProfile"
     private let gameKey = "loop.gameState"
     private let onboardingKey = "loop.hasCompletedOnboarding"
     private let authKey = "loop.authSession"
+    private let lessonProgressKey = "loop.lessonProgress"
+    private var gameStateObservation: AnyCancellable?
 
     init() {
         loadFromStorage()
+        observeGameState()
     }
 
     var isSignedIn: Bool { authSession != nil }
@@ -44,6 +51,8 @@ final class AppState: ObservableObject {
         }
         hasCompletedOnboarding = false
         userProfile = UserProfile()
+        lessonProgressByID = [:]
+        persistLessonProgress()
         authSession = nil
     }
 
@@ -101,6 +110,64 @@ final class AppState: ObservableObject {
         }
     }
 
+    func lessonProgress(for lessonID: String?) -> LessonResumeState? {
+        guard let lessonID, !lessonID.isEmpty else { return nil }
+        return lessonProgressByID[lessonID]
+    }
+
+    func saveTheoryProgress(lessonID: String, stepIndex: Int, totalSteps: Int) {
+        guard !lessonID.isEmpty else { return }
+
+        var progress = lessonProgressByID[lessonID] ?? LessonResumeState(lessonID: lessonID)
+        progress.stage = .theory
+        progress.theoryStepIndex = clamp(stepIndex, upperBound: max(totalSteps - 1, 0))
+        progress.totalTheorySteps = max(totalSteps, 0)
+        progress.updatedAt = Date()
+
+        lessonProgressByID[lessonID] = progress
+        persistLessonProgress()
+    }
+
+    func savePracticeProgress(lessonID: String, exerciseIndex: Int, totalExercises: Int) {
+        guard !lessonID.isEmpty else { return }
+
+        var progress = lessonProgressByID[lessonID] ?? LessonResumeState(lessonID: lessonID)
+        progress.stage = .practice
+        progress.exerciseIndex = clamp(exerciseIndex, upperBound: max(totalExercises - 1, 0))
+        progress.totalExercises = max(totalExercises, 0)
+        progress.updatedAt = Date()
+
+        lessonProgressByID[lessonID] = progress
+        persistLessonProgress()
+    }
+
+    func clearLessonProgress(lessonID: String) {
+        guard !lessonID.isEmpty else { return }
+        lessonProgressByID.removeValue(forKey: lessonID)
+        persistLessonProgress()
+    }
+
+    func recordLessonCompletionLocally(
+        lessonID: String,
+        lessonTitle: String?,
+        xpGained: Int,
+        heartsRemaining: Int
+    ) {
+        lastLessonCompletion = LessonCompletionSummary(
+            lessonID: lessonID,
+            lessonTitle: lessonTitle,
+            xpGained: xpGained,
+            heartsRemaining: heartsRemaining,
+            completedAt: Date()
+        )
+        gameState.applyLessonCompletion(
+            lessonID: lessonID,
+            xpGained: xpGained,
+            heartsRemaining: heartsRemaining
+        )
+        clearLessonProgress(lessonID: lessonID)
+    }
+
     /// Completes a lesson on the backend and refreshes local state.
     /// Used from ExerciseView when the user finishes the full exercise sequence.
     func completeLesson(lessonID: String, lessonTitle: String?) async {
@@ -110,6 +177,14 @@ final class AppState: ObservableObject {
             let response = try await OnboardingAPIClient().completeLesson(token: token, lessonID: lessonID)
 
             await MainActor.run {
+                let wasAlreadyCompletedLocally = self.gameState.completedLessons.contains(lessonID)
+                if !wasAlreadyCompletedLocally {
+                    self.gameState.applyLessonCompletion(
+                        lessonID: lessonID,
+                        xpGained: response.xpGained,
+                        heartsRemaining: response.heartsRemaining
+                    )
+                }
                 self.lastLessonCompletion = LessonCompletionSummary(
                     lessonID: lessonID,
                     lessonTitle: lessonTitle,
@@ -117,6 +192,7 @@ final class AppState: ObservableObject {
                     heartsRemaining: response.heartsRemaining,
                     completedAt: Date()
                 )
+                self.clearLessonProgress(lessonID: lessonID)
             }
 
             await ensureCourseAndLessonLoaded()
@@ -139,6 +215,7 @@ final class AppState: ObservableObject {
         defaults.removeObject(forKey: gameKey)
         defaults.removeObject(forKey: onboardingKey)
         defaults.removeObject(forKey: authKey)
+        defaults.removeObject(forKey: lessonProgressKey)
 
         hasCompletedOnboarding = false
         userProfile = UserProfile()
@@ -158,6 +235,7 @@ final class AppState: ObservableObject {
         isLoadingTodayLesson = false
         courseSyncErrorMessage = nil
         lastLessonCompletion = nil
+        lessonProgressByID = [:]
         authSession = nil
     }
 
@@ -176,6 +254,8 @@ final class AppState: ObservableObject {
             earnedBadges: []
         ))
         persistGameState()
+        lessonProgressByID = [:]
+        persistLessonProgress()
         authSession = nil
     }
 
@@ -191,6 +271,11 @@ final class AppState: ObservableObject {
         if let data = defaults.data(forKey: gameKey),
            let decoded = try? JSONDecoder().decode(GameStateSnapshot.self, from: data) {
             gameState.apply(decoded)
+        }
+
+        if let data = defaults.data(forKey: lessonProgressKey),
+           let decoded = try? JSONDecoder().decode([String: LessonResumeState].self, from: data) {
+            lessonProgressByID = decoded
         }
 
         if let data = defaults.data(forKey: authKey),
@@ -213,6 +298,11 @@ final class AppState: ObservableObject {
         UserDefaults.standard.set(data, forKey: gameKey)
     }
 
+    private func persistLessonProgress() {
+        guard let data = try? JSONEncoder().encode(lessonProgressByID) else { return }
+        UserDefaults.standard.set(data, forKey: lessonProgressKey)
+    }
+
     private func persistAuth() {
         if let session = authSession,
            let data = try? JSONEncoder().encode(session) {
@@ -220,6 +310,18 @@ final class AppState: ObservableObject {
         } else {
             UserDefaults.standard.removeObject(forKey: authKey)
         }
+    }
+
+    private func observeGameState() {
+        gameStateObservation = gameState.objectWillChange.sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.persistGameState()
+            }
+        }
+    }
+
+    private func clamp(_ value: Int, upperBound: Int) -> Int {
+        min(max(value, 0), max(upperBound, 0))
     }
 
     private func ensureCourseAndLessonLoaded() async {
@@ -642,167 +744,6 @@ struct LessonSummary: Decodable, Identifiable, Equatable {
         case estimatedMinutes = "estimated_minutes"
         case xpReward = "xp_reward"
         case difficulty
-    }
-}
-
-struct LessonPayload: Decodable, Identifiable {
-    let id: String
-    let title: String
-    let orderIndex: Int
-    let estimatedMinutes: Int
-    let xpReward: Int
-    let blocks: [LessonBlockPayload]
-    let exercises: [LessonExercisePayload]
-
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case title
-        case orderIndex = "order_index"
-        case estimatedMinutes = "estimated_minutes"
-        case xpReward = "xp_reward"
-        case blocks
-        case exercises
-    }
-}
-
-struct LessonBlockPayload: Decodable, Identifiable {
-    let id: String
-    let type: String
-    let title: String?
-    let text: String
-    let examples: [String]
-    let keyPoints: [String]
-    let codeSnippet: String?
-    let language: String?
-    let orderIndex: Int
-
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case type
-        case title
-        case content
-        case orderIndex = "order_index"
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(String.self, forKey: .id)
-        type = try container.decode(String.self, forKey: .type)
-        title = try container.decodeIfPresent(String.self, forKey: .title)
-        orderIndex = try container.decode(Int.self, forKey: .orderIndex)
-
-        if let contentString = try? container.decode(String.self, forKey: .content) {
-            text = contentString
-            examples = []
-            keyPoints = []
-            codeSnippet = nil
-            language = nil
-        } else if let rawContent = try? container.decode(LessonBlockContent.self, forKey: .content) {
-            text = rawContent.text ?? ""
-            examples = rawContent.examples ?? []
-            keyPoints = rawContent.keyPoints ?? []
-            codeSnippet = rawContent.codeSnippet
-            language = rawContent.language
-        } else {
-            text = ""
-            examples = []
-            keyPoints = []
-            codeSnippet = nil
-            language = nil
-        }
-    }
-}
-
-private struct LessonBlockContent: Decodable {
-    let text: String?
-    let examples: [String]?
-    let keyPoints: [String]?
-    let codeSnippet: String?
-    let language: String?
-
-    private enum CodingKeys: String, CodingKey {
-        case text
-        case examples
-        case keyPoints = "key_points"
-        case codeSnippet = "code_snippet"
-        case language
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        text = try container.decodeIfPresent(String.self, forKey: .text)
-        examples = Self.decodeStringArray(container: container, forKey: .examples)
-        keyPoints = Self.decodeStringArray(container: container, forKey: .keyPoints)
-        codeSnippet = try container.decodeIfPresent(String.self, forKey: .codeSnippet)
-        language = try container.decodeIfPresent(String.self, forKey: .language)
-    }
-
-    private static func decodeStringArray(container: KeyedDecodingContainer<CodingKeys>, forKey key: CodingKeys) -> [String]? {
-        if let values = try? container.decodeIfPresent([String].self, forKey: key) {
-            return values
-        }
-        return nil
-    }
-}
-
-struct LessonExercisePayload: Decodable {
-    let id: String
-    let type: String
-    let question: String
-    let codeSnippet: String?
-    let codeTemplate: String?
-    let blankPosition: Int?
-    let choices: [String]
-    let options: [String]
-    let correctIndex: Int?
-    let correctAnswer: String?
-    let correctAnswerDisplay: String?
-    let hints: [String]
-    let explanation: String
-    let difficulty: String?
-    let language: String?
-    let xpReward: Int?
-    let orderIndex: Int?
-
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case type
-        case question
-        case codeSnippet = "code_snippet"
-        case codeTemplate = "code_template"
-        case blankPosition = "blank_position"
-        case choices
-        case options
-        case correctIndex = "correct_index"
-        case correctAnswer = "correct_answer"
-        case correctAnswerDisplay = "correct_answer_display"
-        case hints
-        case explanation
-        case difficulty
-        case language
-        case xpReward = "xp_reward"
-        case orderIndex = "order_index"
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(String.self, forKey: .id)
-        type = try c.decode(String.self, forKey: .type)
-        question = try c.decode(String.self, forKey: .question)
-        codeSnippet = try c.decodeIfPresent(String.self, forKey: .codeSnippet)
-        codeTemplate = try c.decodeIfPresent(String.self, forKey: .codeTemplate)
-        blankPosition = try c.decodeIfPresent(Int.self, forKey: .blankPosition)
-        choices = (try? c.decode([String].self, forKey: .choices)) ?? []
-        options = (try? c.decode([String].self, forKey: .options)) ?? []
-        correctIndex = try c.decodeIfPresent(Int.self, forKey: .correctIndex)
-        correctAnswer = try c.decodeIfPresent(String.self, forKey: .correctAnswer)
-        correctAnswerDisplay = try c.decodeIfPresent(String.self, forKey: .correctAnswerDisplay)
-        hints = (try? c.decode([String].self, forKey: .hints)) ?? []
-        explanation = try c.decode(String.self, forKey: .explanation)
-        difficulty = try c.decodeIfPresent(String.self, forKey: .difficulty)
-        language = try c.decodeIfPresent(String.self, forKey: .language)
-        xpReward = try c.decodeIfPresent(Int.self, forKey: .xpReward)
-        orderIndex = try c.decodeIfPresent(Int.self, forKey: .orderIndex)
     }
 }
 

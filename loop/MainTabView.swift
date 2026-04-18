@@ -22,13 +22,14 @@ struct MainTabView: View {
                     .environmentObject(appState)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .overlay(alignment: .bottom) {
             BottomNavBar(selected: $selected)
-                .padding(.top, Spacing.xs)
+                .ignoresSafeArea(edges: .bottom)
         }
         .fullScreenCover(isPresented: $showExercise) {
             ExerciseView(
                 lesson: appState.todayLesson,
+                initialExerciseIndex: appState.lessonProgress(for: appState.todayLesson?.id)?.exerciseIndex,
                 onCompleted: {
                     showExercise = false
                     showCelebration = true

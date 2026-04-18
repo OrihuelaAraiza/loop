@@ -1,14 +1,14 @@
 import Combine
 import SwiftUI
 
-enum RoadmapNodeState {
+enum RoadmapNodeState: Equatable {
     case completed
     case active
     case locked
 }
 
 struct RoadmapNode: Identifiable {
-    let id = UUID()
+    let id: String
     let order: Int
     let title: String
     let icon: String
@@ -74,6 +74,8 @@ struct MapView: View {
         .fullScreenCover(item: $theoryLesson) { lesson in
             LessonTheoryView(
                 lesson: lesson,
+                courseLanguage: appState.currentCourse?.language ?? "Python",
+                initialStepIndex: appState.lessonProgress(for: lesson.id)?.theoryStepIndex,
                 onStartPractice: {
                     theoryLesson = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -86,6 +88,7 @@ struct MapView: View {
         .fullScreenCover(item: $practiceLesson) { lesson in
             ExerciseView(
                 lesson: lesson,
+                initialExerciseIndex: appState.lessonProgress(for: lesson.id)?.exerciseIndex,
                 onCompleted: {
                     practiceLesson = nil
                     appState.refreshTodayLesson()
@@ -142,28 +145,38 @@ struct MapView: View {
         appState.todayLesson?.orderIndex
     }
 
+    private var completedLessonIDs: Set<String> {
+        appState.gameState.completedLessons
+    }
+
     private var roadmapNodes: [RoadmapNode] {
         let summaries = (appState.currentCourse?.lessons ?? []).sorted { $0.orderIndex < $1.orderIndex }
 
         // If backend already sent the real lesson list, use that.
         if !summaries.isEmpty {
+            var activeNodeAssigned = false
+
             return summaries.map { summary in
+                let completed = isCompleted(summary)
+                let canActivate = !activeNodeAssigned && isActivatable(summary)
                 let state: RoadmapNodeState
-                switch summary.status {
-                case "ready":
-                    state = summary.orderIndex == todayOrderIndex ? .active : .active
-                case "failed":
-                    state = .locked
-                default:
+
+                if completed {
+                    state = .completed
+                } else if canActivate {
+                    state = .active
+                    activeNodeAssigned = true
+                } else {
                     state = .locked
                 }
 
                 let isInteractive =
-                    summary.status == "ready" &&
-                    summary.orderIndex == todayOrderIndex &&
+                    state == .active &&
+                    matchesToday(summary) &&
                     appState.todayLesson != nil
 
                 return RoadmapNode(
+                    id: summary.id.isEmpty ? "lesson-\(summary.orderIndex)" : summary.id,
                     order: summary.orderIndex,
                     title: summary.title.isEmpty ? "Leccion \(summary.orderIndex)" : summary.title,
                     icon: "book.fill",
@@ -174,20 +187,21 @@ struct MapView: View {
         }
 
         // Fallback: no lesson list (older server or course not yet built)
-        let activeOrder = todayOrderIndex ?? (readyLessons > 0 ? 1 : nil)
+        let completedCount = min(completedLessonIDs.count, totalLessons)
+        let activeOrder = completedCount < totalLessons ? completedCount + 1 : nil
 
         return (1 ... totalLessons).map { index in
             let state: RoadmapNodeState
             if let activeOrder {
-                if index < activeOrder {
+                if index < activeOrder || completedCount >= index {
                     state = .completed
                 } else if index == activeOrder {
                     state = .active
                 } else {
-                    state = index <= readyLessons ? .active : .locked
+                    state = .locked
                 }
             } else {
-                state = index <= readyLessons ? .active : .locked
+                state = completedCount >= index ? .completed : .locked
             }
 
             let title: String
@@ -197,9 +211,13 @@ struct MapView: View {
                 title = "Leccion \(index)"
             }
 
-            let isInteractive = index == todayOrderIndex && appState.todayLesson != nil
+            let isInteractive =
+                state == .active &&
+                index == todayOrderIndex &&
+                appState.todayLesson != nil
 
             return RoadmapNode(
+                id: "lesson-\(index)",
                 order: index,
                 title: title,
                 icon: "book.fill",
@@ -279,7 +297,7 @@ struct MapView: View {
                             total: roadmapNodes.count,
                             onTap: {
                                 guard node.isInteractive, let lesson = appState.todayLesson else { return }
-                                theoryLesson = lesson
+                                openLesson(lesson)
                             }
                         )
                         .scaleEffect(reveal ? 1 : 0.96)
@@ -294,6 +312,36 @@ struct MapView: View {
             }
         }
     }
+
+    private func openLesson(_ lesson: LessonPayload) {
+        let resumeState = appState.lessonProgress(for: lesson.id)
+        if resumeState?.stage == .practice {
+            practiceLesson = lesson
+        } else {
+            theoryLesson = lesson
+        }
+    }
+
+    private func isCompleted(_ summary: LessonSummary) -> Bool {
+        let normalizedStatus = summary.status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return completedLessonIDs.contains(summary.id) ||
+            normalizedStatus == "completed" ||
+            normalizedStatus == "done"
+    }
+
+    private func isActivatable(_ summary: LessonSummary) -> Bool {
+        let normalizedStatus = summary.status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return matchesToday(summary) ||
+            normalizedStatus == "ready" ||
+            normalizedStatus == "available" ||
+            normalizedStatus == "active" ||
+            normalizedStatus == "in_progress"
+    }
+
+    private func matchesToday(_ summary: LessonSummary) -> Bool {
+        summary.id == appState.todayLesson?.id ||
+            summary.orderIndex == todayOrderIndex
+    }
 }
 
 private struct RoadmapRow: View {
@@ -305,6 +353,7 @@ private struct RoadmapRow: View {
 
     @State private var pulse = false
     @State private var connectorProgress: CGFloat = 0
+    @State private var hasAnimatedOnAppear = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isLeft: Bool { index % 2 == 0 }
@@ -318,7 +367,7 @@ private struct RoadmapRow: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
-        .opacity(node.state == .locked ? 0.4 : 1)
+        .opacity(node.state == .locked ? 0.58 : 1)
         .overlay(alignment: .center) {
             if !isLast {
                 RoadmapConnector(
@@ -333,15 +382,14 @@ private struct RoadmapRow: View {
             }
         }
         .onAppear {
-            let delay = Double(index) * 0.1
-            withAnimation(.easeOut(duration: 0.9).delay(delay)) {
-                connectorProgress = 1
-            }
-            if node.state == .active, !reduceMotion {
-                withAnimation(LoopAnimation.pulseSlow) {
-                    pulse = true
-                }
-            }
+            updateAnimationState(animated: !hasAnimatedOnAppear)
+            hasAnimatedOnAppear = true
+        }
+        .onChange(of: node.state) { _, _ in
+            updateAnimationState(animated: true)
+        }
+        .onChange(of: reduceMotion) { _, _ in
+            updateAnimationState(animated: false)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -353,6 +401,34 @@ private struct RoadmapRow: View {
 
     private var nextNodeIsReachable: Bool {
         node.state == .completed
+    }
+
+    private func updateAnimationState(animated: Bool) {
+        let targetConnectorProgress: CGFloat = nextNodeIsReachable ? 1 : 0
+
+        if nextNodeIsReachable && animated {
+            connectorProgress = 0
+            withAnimation(.easeOut(duration: 0.9).delay(Double(index) * 0.1)) {
+                connectorProgress = 1
+            }
+        } else {
+            connectorProgress = targetConnectorProgress
+        }
+
+        guard node.state == .active, !reduceMotion else {
+            pulse = false
+            return
+        }
+
+        if !pulse {
+            if animated {
+                withAnimation(LoopAnimation.pulseSlow) {
+                    pulse = true
+                }
+            } else {
+                pulse = true
+            }
+        }
     }
 
     private var content: some View {
@@ -385,6 +461,11 @@ private struct RoadmapRow: View {
                 .font(.system(size: 22, weight: .bold))
                 .foregroundColor(iconColor)
 
+            if node.state == .locked {
+                lockedBadge
+                    .offset(x: 22, y: 22)
+            }
+
             if node.state == .active {
                 Circle()
                     .stroke(tint.opacity(pulse ? 0.65 : 0.3), lineWidth: 2)
@@ -408,6 +489,14 @@ private struct RoadmapRow: View {
                 .padding(.vertical, 3)
                 .background(stateLabelColor.opacity(0.16))
                 .clipShape(Capsule())
+
+            if let lockedHint {
+                Text(lockedHint)
+                    .font(LoopFont.regular(11))
+                    .foregroundColor(.textMuted)
+                    .multilineTextAlignment(alignment == .leading ? .leading : .trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -466,6 +555,27 @@ private struct RoadmapRow: View {
         case .completed: return .mint
         case .active: return tint
         case .locked: return .textMuted
+        }
+    }
+
+    private var lockedHint: String? {
+        guard node.state == .locked else { return nil }
+        return "Completa la anterior para desbloquearla"
+    }
+
+    private var lockedBadge: some View {
+        ZStack {
+            Circle()
+                .fill(Color.loopBG.opacity(0.92))
+                .frame(width: 22, height: 22)
+                .overlay(
+                    Circle()
+                        .stroke(Color.borderMid, lineWidth: 1)
+                )
+
+            Image(systemName: "lock.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.textPrimary)
         }
     }
 }

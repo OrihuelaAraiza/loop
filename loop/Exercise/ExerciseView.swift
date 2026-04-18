@@ -8,8 +8,13 @@ struct ExerciseView: View {
     let onCompleted: () -> Void
     var onClose: (() -> Void)?
 
-    init(lesson: LessonPayload? = nil, onCompleted: @escaping () -> Void, onClose: (() -> Void)? = nil) {
-        _viewModel = StateObject(wrappedValue: ExerciseViewModel(lesson: lesson))
+    init(
+        lesson: LessonPayload? = nil,
+        initialExerciseIndex: Int? = nil,
+        onCompleted: @escaping () -> Void,
+        onClose: (() -> Void)? = nil
+    ) {
+        _viewModel = StateObject(wrappedValue: ExerciseViewModel(lesson: lesson, initialIndex: initialExerciseIndex))
         self.onCompleted = onCompleted
         self.onClose = onClose
     }
@@ -30,16 +35,21 @@ struct ExerciseView: View {
                 )
             }
         }
+        .onAppear {
+            persistProgress()
+        }
+        .onChange(of: viewModel.currentIndex) { _, _ in
+            persistProgress()
+        }
     }
 
     private func handleSequenceCompleted() {
         if let lessonID = viewModel.lessonID {
-            appState.lastLessonCompletion = LessonCompletionSummary(
+            appState.recordLessonCompletionLocally(
                 lessonID: lessonID,
                 lessonTitle: viewModel.lessonTitle,
                 xpGained: viewModel.lessonXPReward ?? 0,
-                heartsRemaining: appState.gameState.hearts,
-                completedAt: Date()
+                heartsRemaining: appState.gameState.hearts
             )
 
             Task {
@@ -51,11 +61,21 @@ struct ExerciseView: View {
     }
 
     private func closeFlow() {
+        persistProgress()
         if let onClose {
             onClose()
         } else {
             dismiss()
         }
+    }
+
+    private func persistProgress() {
+        guard let lessonID = viewModel.lessonID, !viewModel.exercises.isEmpty else { return }
+        appState.savePracticeProgress(
+            lessonID: lessonID,
+            exerciseIndex: viewModel.currentIndex,
+            totalExercises: viewModel.exercises.count
+        )
     }
 }
 
