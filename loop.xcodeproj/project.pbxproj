@@ -13,6 +13,7 @@
 		E80822252F90617300EB48F0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = E80822232F90617300EB48F0 /* Lottie */; };
 		E8EB55CD2F91BBB300865574 /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = A10000012F90617300EB48F0 /* Pow */; };
 		E8EB55CE2F91BBB300865574 /* Vortex in Frameworks */ = {isa = PBXBuildFile; productRef = A10000022F90617300EB48F0 /* Vortex */; };
+		F10000012F90617300EB48F0 /* RiveRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = F10000022F90617300EB48F0 /* RiveRuntime */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +68,7 @@
 				A10000072F90617300EB48F0 /* SPAlert in Frameworks */,
 				E80822242F90617300EB48F0 /* HighlightSwift in Frameworks */,
 				E80822252F90617300EB48F0 /* Lottie in Frameworks */,
+				F10000012F90617300EB48F0 /* RiveRuntime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -133,6 +135,7 @@
 				A10000022F90617300EB48F0 /* Vortex */,
 				A10000062F90617300EB48F0 /* SkeletonUI */,
 				A10000082F90617300EB48F0 /* SPAlert */,
+				F10000022F90617300EB48F0 /* RiveRuntime */,
 			);
 			productName = loop;
 			productReference = E80821EE2F90617300EB48EF /* loop.app */;
@@ -223,6 +226,7 @@
 				A10000042F90617300EB48F0 /* XCRemoteSwiftPackageReference "Vortex" */,
 				A10000092F90617300EB48F0 /* XCRemoteSwiftPackageReference "SkeletonUI" */,
 				A100000A2F90617300EB48F0 /* XCRemoteSwiftPackageReference "SPAlert" */,
+				F10000032F90617300EB48F0 /* XCRemoteSwiftPackageReference "rive-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E80821EF2F90617300EB48EF /* Products */;
@@ -663,6 +667,14 @@
 				minimumVersion = 4.4.1;
 			};
 		};
+		F10000032F90617300EB48F0 /* XCRemoteSwiftPackageReference "rive-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/rive-app/rive-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.19.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -695,6 +707,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E80822212F90617300EB48F0 /* XCRemoteSwiftPackageReference "lottie-ios" */;
 			productName = Lottie;
+		};
+		F10000022F90617300EB48F0 /* RiveRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F10000032F90617300EB48F0 /* XCRemoteSwiftPackageReference "rive-ios" */;
+			productName = RiveRuntime;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -50,6 +50,19 @@ struct LoopyExpressionView: View {
     let expression: LoopyExpression
     var size: CGFloat = 80
 
+    var body: some View {
+        LoopyRiveAvatar(state: expression.riveState, variant: .compact) {
+            LoopyLegacyExpressionView(expression: expression, size: size)
+        }
+        .frame(width: size, height: size)
+        .clipped()
+    }
+}
+
+private struct LoopyLegacyExpressionView: View {
+    let expression: LoopyExpression
+    var size: CGFloat = 80
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isFloating = false
     @State private var isBlinking = false

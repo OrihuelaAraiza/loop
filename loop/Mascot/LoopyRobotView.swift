@@ -2,6 +2,16 @@ import SwiftUI
 
 struct LoopyView: View {
     var mood: LoopyMood = .idle
+
+    var body: some View {
+        LoopyRiveAvatar(state: mood.riveState, variant: .hero) {
+            LoopyLegacyRobotView(mood: mood)
+        }
+    }
+}
+
+private struct LoopyLegacyRobotView: View {
+    var mood: LoopyMood = .idle
     @State private var bob = false
 
     var body: some View {
