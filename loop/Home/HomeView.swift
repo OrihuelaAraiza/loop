@@ -31,13 +31,25 @@ struct HomeView: View {
         max(appState.currentCourse?.totalLessons ?? 0, 0)
     }
 
-    private var readyLessons: Int {
-        min(appState.currentCourse?.resolvedReadyLessons ?? 0, max(totalLessons, 0))
+    private var availableLessons: Int {
+        min(appState.currentCourse?.resolvedAvailableLessons ?? 0, max(totalLessons, 0))
+    }
+
+    private var completedLessons: Int {
+        if let currentCourse = appState.currentCourse, !currentCourse.lessons.isEmpty {
+            let completedStatuses = Set(["completed", "done"])
+            let count = currentCourse.lessons.filter { summary in
+                appState.gameState.completedLessons.contains(summary.id) || completedStatuses.contains(summary.status.lowercased())
+            }.count
+            return min(count, max(totalLessons, 0))
+        }
+
+        return min(appState.gameState.completedLessons.count, max(totalLessons, 0))
     }
 
     private var courseProgress: Double {
         guard totalLessons > 0 else { return 0 }
-        return min(max(Double(readyLessons) / Double(totalLessons), 0), 1)
+        return min(max(Double(completedLessons) / Double(totalLessons), 0), 1)
     }
 
     private var weeklyStates: [DayNode.DayState] {
@@ -251,7 +263,7 @@ struct HomeView: View {
                 )
                 ProgressMetricCard(
                     title: "Lecciones",
-                    value: totalLessons > 0 ? "\(readyLessons)/\(totalLessons)" : "--",
+                    value: totalLessons > 0 ? "\(availableLessons)/\(totalLessons)" : "--",
                     icon: "book.fill",
                     tint: .periwinkle
                 )
@@ -266,7 +278,7 @@ struct HomeView: View {
                 )
                 ProgressMetricCard(
                     title: "Lecciones",
-                    value: totalLessons > 0 ? "\(readyLessons)/\(totalLessons)" : "--",
+                    value: totalLessons > 0 ? "\(availableLessons)/\(totalLessons)" : "--",
                     icon: "book.fill",
                     tint: .periwinkle
                 )

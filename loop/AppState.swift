@@ -28,12 +28,15 @@ final class AppState: ObservableObject {
     @Published var courseSyncErrorMessage: String?
     @Published var lastLessonCompletion: LessonCompletionSummary?
     @Published private(set) var lessonProgressByID: [String: LessonResumeState] = [:]
+    @Published private(set) var customRoutes: [CustomRouteRecord] = []
 
     private let profileKey = "loop.userProfile"
     private let gameKey = "loop.gameState"
     private let onboardingKey = "loop.hasCompletedOnboarding"
     private let authKey = "loop.authSession"
     private let lessonProgressKey = "loop.lessonProgress"
+    private let customRoutesKey = "loop.customRoutes"
+    private let legacyPendingCourseRequestKey = "loop.pendingCourseRequest"
     private var gameStateObservation: AnyCancellable?
 
     init() {
@@ -53,6 +56,8 @@ final class AppState: ObservableObject {
         userProfile = UserProfile()
         lessonProgressByID = [:]
         persistLessonProgress()
+        customRoutes = []
+        persistCustomRoutes()
         authSession = nil
     }
 
@@ -168,6 +173,66 @@ final class AppState: ObservableObject {
         clearLessonProgress(lessonID: lessonID)
     }
 
+    @MainActor
+    func createCustomCourse(request: CourseGenerationRequest) async -> Bool {
+        guard let token = authSession?.apiToken else {
+            courseSyncErrorMessage = "Necesitas iniciar sesion para crear una nueva ruta."
+            return false
+        }
+
+        let normalizedRequest = request.normalized()
+        guard normalizedRequest.isValid else {
+            courseSyncErrorMessage = "Describe el curso o el enfoque antes de generarlo."
+            return false
+        }
+
+        let record = CustomRouteRecord.draft(from: normalizedRequest)
+        customRoutes.insert(record, at: 0)
+        persistCustomRoutes()
+        courseSyncErrorMessage = nil
+        todayLesson = nil
+        isGeneratingCourse = true
+
+        var updatedProfile = userProfile
+        let basePlan = updatedProfile.generatedPlan ?? PlanGenerator.generatePlan(from: updatedProfile)
+        updatedProfile.generatedPlan = LearningPlan(
+            language: normalizedRequest.language,
+            startModule: basePlan.startModule,
+            weeksEstimated: basePlan.weeksEstimated,
+            dailyLessons: basePlan.dailyLessons,
+            milestoneWeek: basePlan.milestoneWeek,
+            aiReasons: basePlan.aiReasons
+        )
+        userProfile = updatedProfile
+
+        do {
+            let api = OnboardingAPIClient()
+            let generated: GenerateCourseResponsePayload
+
+            do {
+                generated = try await api.generateCourse(token: token, request: normalizedRequest)
+            } catch {
+                generated = try await api.generateCourse(token: token)
+            }
+
+            updateCustomRoute(recordID: record.id) { route in
+                route.backendCourseID = generated.course.id
+                route.status = generated.course.shouldPresentGeneratingState ? .queued : .active
+            }
+
+            await ensureCourseAndLessonLoaded()
+            reconcileCustomRoutes(with: currentCourse)
+            return true
+        } catch {
+            updateCustomRoute(recordID: record.id) { route in
+                route.status = .failed
+            }
+            courseSyncErrorMessage = "No pudimos crear la nueva ruta. Intentalo de nuevo."
+            isGeneratingCourse = false
+            return false
+        }
+    }
+
     /// Completes a lesson on the backend and refreshes local state.
     /// Used from ExerciseView when the user finishes the full exercise sequence.
     func completeLesson(lessonID: String, lessonTitle: String?) async {
@@ -216,6 +281,8 @@ final class AppState: ObservableObject {
         defaults.removeObject(forKey: onboardingKey)
         defaults.removeObject(forKey: authKey)
         defaults.removeObject(forKey: lessonProgressKey)
+        defaults.removeObject(forKey: customRoutesKey)
+        defaults.removeObject(forKey: legacyPendingCourseRequestKey)
 
         hasCompletedOnboarding = false
         userProfile = UserProfile()
@@ -236,6 +303,7 @@ final class AppState: ObservableObject {
         courseSyncErrorMessage = nil
         lastLessonCompletion = nil
         lessonProgressByID = [:]
+        customRoutes = []
         authSession = nil
     }
 
@@ -256,6 +324,8 @@ final class AppState: ObservableObject {
         persistGameState()
         lessonProgressByID = [:]
         persistLessonProgress()
+        customRoutes = []
+        persistCustomRoutes()
         authSession = nil
     }
 
@@ -276,6 +346,14 @@ final class AppState: ObservableObject {
         if let data = defaults.data(forKey: lessonProgressKey),
            let decoded = try? JSONDecoder().decode([String: LessonResumeState].self, from: data) {
             lessonProgressByID = decoded
+        }
+
+        if let data = defaults.data(forKey: customRoutesKey),
+           let decoded = try? JSONDecoder().decode([CustomRouteRecord].self, from: data) {
+            customRoutes = decoded
+        } else if let data = defaults.data(forKey: legacyPendingCourseRequestKey),
+                  let decoded = try? JSONDecoder().decode(CourseGenerationRequest.self, from: data) {
+            customRoutes = [CustomRouteRecord.draft(from: decoded)]
         }
 
         if let data = defaults.data(forKey: authKey),
@@ -303,6 +381,18 @@ final class AppState: ObservableObject {
         UserDefaults.standard.set(data, forKey: lessonProgressKey)
     }
 
+    private func persistCustomRoutes() {
+        let defaults = UserDefaults.standard
+        guard !customRoutes.isEmpty else {
+            defaults.removeObject(forKey: customRoutesKey)
+            defaults.removeObject(forKey: legacyPendingCourseRequestKey)
+            return
+        }
+        guard let data = try? JSONEncoder().encode(customRoutes) else { return }
+        defaults.set(data, forKey: customRoutesKey)
+        defaults.removeObject(forKey: legacyPendingCourseRequestKey)
+    }
+
     private func persistAuth() {
         if let session = authSession,
            let data = try? JSONEncoder().encode(session) {
@@ -322,6 +412,43 @@ final class AppState: ObservableObject {
 
     private func clamp(_ value: Int, upperBound: Int) -> Int {
         min(max(value, 0), max(upperBound, 0))
+    }
+
+    private func updateCustomRoute(recordID: String, mutate: (inout CustomRouteRecord) -> Void) {
+        guard let index = customRoutes.firstIndex(where: { $0.id == recordID }) else { return }
+        mutate(&customRoutes[index])
+        customRoutes[index].updatedAt = Date()
+        customRoutes.sort { $0.updatedAt > $1.updatedAt }
+        persistCustomRoutes()
+    }
+
+    private func reconcileCustomRoutes(with course: CourseStatusPayload?) {
+        guard !customRoutes.isEmpty else { return }
+
+        let activeCourseID = course?.id
+        var didChange = false
+
+        for index in customRoutes.indices {
+            let nextStatus: CustomRouteStatus
+
+            if let activeCourseID, customRoutes[index].backendCourseID == activeCourseID {
+                nextStatus = .active
+            } else if customRoutes[index].status == .active || customRoutes[index].status == .requesting {
+                nextStatus = .queued
+            } else {
+                continue
+            }
+
+            if customRoutes[index].status != nextStatus {
+                customRoutes[index].status = nextStatus
+                customRoutes[index].updatedAt = Date()
+                didChange = true
+            }
+        }
+
+        guard didChange else { return }
+        customRoutes.sort { $0.updatedAt > $1.updatedAt }
+        persistCustomRoutes()
     }
 
     private func ensureCourseAndLessonLoaded() async {
@@ -348,8 +475,7 @@ final class AppState: ObservableObject {
             } else {
                 await MainActor.run {
                     self.currentCourse = currentCourse.course
-                    self.isGeneratingCourse =
-                        !(currentCourse.course?.status == "ready_first_lesson" || currentCourse.course?.status == "ready_full")
+                    self.isGeneratingCourse = currentCourse.course?.shouldPresentGeneratingState ?? true
                 }
 
                 let failedCount = currentCourse.course?.lessonStatusCounts["failed"] ?? 0
@@ -368,8 +494,9 @@ final class AppState: ObservableObject {
                 if let course = resolvedCourse {
                     self.currentCourse = course
                 }
+                self.reconcileCustomRoutes(with: resolvedCourse)
                 self.isLoadingTodayLesson = false
-                self.isGeneratingCourse = today.lesson == nil
+                self.isGeneratingCourse = resolvedCourse?.shouldPresentGeneratingState ?? (today.lesson == nil)
                 self.courseSyncErrorMessage = nil
             }
         } catch {
@@ -454,8 +581,15 @@ struct OnboardingAPIClient {
         return try JSONDecoder().decode(CurrentCourseResponsePayload.self, from: data)
     }
 
-    fileprivate func generateCourse(token: String) async throws -> GenerateCourseResponsePayload {
-        let request = makeRequest(path: "courses/generate", method: "POST", token: token)
+    fileprivate func generateCourse(
+        token: String,
+        request customRequest: CourseGenerationRequest? = nil
+    ) async throws -> GenerateCourseResponsePayload {
+        var request = makeRequest(path: "courses/generate", method: "POST", token: token)
+        if let customRequest {
+            request.httpBody = try JSONEncoder().encode(GenerateCourseRequestPayload.from(customRequest))
+        }
+
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
@@ -558,6 +692,23 @@ private struct PlanPayload: Encodable {
         case dailyLessons = "daily_lessons"
         case milestoneWeek = "milestone_week"
         case aiReasons = "ai_reasons"
+    }
+}
+
+private struct GenerateCourseRequestPayload: Encodable {
+    let language: String
+    let framework: String?
+    let prompt: String?
+    let focus: String?
+
+    static func from(_ request: CourseGenerationRequest) -> GenerateCourseRequestPayload {
+        let normalized = request.normalized()
+        return GenerateCourseRequestPayload(
+            language: normalized.language.rawValue,
+            framework: normalized.frameworkName,
+            prompt: normalized.trimmedPrompt.isEmpty ? nil : normalized.trimmedPrompt,
+            focus: normalized.trimmedFocus.isEmpty ? nil : normalized.trimmedFocus
+        )
     }
 }
 
@@ -724,6 +875,33 @@ struct CourseStatusPayload: Decodable {
             return lessons.filter { $0.status == "ready" }.count
         }
         return lessonStatusCounts["ready"] ?? 0
+    }
+
+    var resolvedAvailableLessons: Int {
+        if !lessons.isEmpty {
+            let availableStatuses = Set(["ready", "available", "active", "in_progress", "completed", "done"])
+            return min(lessons.filter { availableStatuses.contains($0.status.lowercased()) }.count, max(totalLessons, 0))
+        }
+
+        let availableStatuses = ["ready", "available", "active", "in_progress", "completed", "done"]
+        let total = availableStatuses.reduce(0) { partialResult, status in
+            partialResult + (lessonStatusCounts[status] ?? 0)
+        }
+        return min(total, max(totalLessons, 0))
+    }
+
+    var shouldPresentGeneratingState: Bool {
+        let normalizedStatus = status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch normalizedStatus {
+        case "ready_first_lesson", "ready_full":
+            return false
+        case "draft", "generating", "queued", "pending":
+            return true
+        case "failed":
+            return false
+        default:
+            return resolvedAvailableLessons == 0
+        }
     }
 }
 

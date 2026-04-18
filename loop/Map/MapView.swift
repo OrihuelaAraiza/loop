@@ -29,6 +29,7 @@ struct MapView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var theoryLesson: LessonPayload?
     @State private var practiceLesson: LessonPayload?
+    @State private var pendingOpenLessonOrder: Int?
 
     private let refreshTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
 
@@ -71,6 +72,12 @@ struct MapView: View {
             guard isStillGenerating else { return }
             appState.refreshTodayLesson()
         }
+        .onChange(of: appState.todayLesson?.id) { _, _ in
+            guard let pendingOpenLessonOrder, let lesson = appState.todayLesson else { return }
+            guard lesson.orderIndex == pendingOpenLessonOrder else { return }
+            self.pendingOpenLessonOrder = nil
+            openLesson(lesson)
+        }
         .fullScreenCover(item: $theoryLesson) { lesson in
             LessonTheoryView(
                 lesson: lesson,
@@ -106,8 +113,7 @@ struct MapView: View {
     }
 
     private var isStillGenerating: Bool {
-        let status = appState.currentCourse?.status ?? "draft"
-        return status != "ready_full"
+        appState.isGeneratingCourse
     }
 
     private var courseTitle: String {
@@ -120,12 +126,25 @@ struct MapView: View {
         max(appState.currentCourse?.totalLessons ?? 1, 1)
     }
 
-    private var readyLessons: Int {
-        appState.currentCourse?.lessonStatusCounts["ready"] ?? 0
+    private var availableLessons: Int {
+        min(appState.currentCourse?.resolvedAvailableLessons ?? 0, max(totalLessons, 0))
+    }
+
+    private var completedLessonsCount: Int {
+        if let currentCourse = appState.currentCourse, !currentCourse.lessons.isEmpty {
+            let completedStatuses = Set(["completed", "done"])
+            let count = currentCourse.lessons.filter { summary in
+                completedLessonIDs.contains(summary.id) || completedStatuses.contains(summary.status.lowercased())
+            }.count
+            return min(count, max(totalLessons, 0))
+        }
+
+        return min(completedLessonIDs.count, max(totalLessons, 0))
     }
 
     private var routeProgress: Double {
-        min(max(Double(readyLessons) / Double(max(totalLessons, 1)), 0), 1)
+        guard totalLessons > 0 else { return 0 }
+        return min(max(Double(completedLessonsCount) / Double(max(totalLessons, 1)), 0), 1)
     }
 
     private var generatedDescription: String {
@@ -170,10 +189,7 @@ struct MapView: View {
                     state = .locked
                 }
 
-                let isInteractive =
-                    state == .active &&
-                    matchesToday(summary) &&
-                    appState.todayLesson != nil
+                let isInteractive = state == .active
 
                 return RoadmapNode(
                     id: summary.id.isEmpty ? "lesson-\(summary.orderIndex)" : summary.id,
@@ -211,10 +227,7 @@ struct MapView: View {
                 title = "Leccion \(index)"
             }
 
-            let isInteractive =
-                state == .active &&
-                index == todayOrderIndex &&
-                appState.todayLesson != nil
+            let isInteractive = state == .active
 
             return RoadmapNode(
                 id: "lesson-\(index)",
@@ -264,15 +277,13 @@ struct MapView: View {
                 }
                 LoopProgressBar(progress: routeProgress, height: 10)
                 HStack {
-                    Text("Lecciones listas: \(readyLessons)/\(totalLessons)")
+                    Text("Completadas: \(completedLessonsCount)/\(totalLessons)")
                         .font(LoopFont.regular(12))
                         .foregroundColor(.textSecond)
                     Spacer()
-                    if isStillGenerating {
-                        Text("Generando...")
-                            .font(LoopFont.bold(11))
-                            .foregroundColor(.loopGold)
-                    }
+                    Text("Disponibles: \(availableLessons)/\(totalLessons)")
+                        .font(LoopFont.bold(11))
+                        .foregroundColor(isStillGenerating ? .loopGold : .coral)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -296,8 +307,7 @@ struct MapView: View {
                             index: index,
                             total: roadmapNodes.count,
                             onTap: {
-                                guard node.isInteractive, let lesson = appState.todayLesson else { return }
-                                openLesson(lesson)
+                                handleNodeTap(node)
                             }
                         )
                         .scaleEffect(reveal ? 1 : 0.96)
@@ -320,6 +330,19 @@ struct MapView: View {
         } else {
             theoryLesson = lesson
         }
+    }
+
+    private func handleNodeTap(_ node: RoadmapNode) {
+        guard node.isInteractive else { return }
+
+        if let lesson = appState.todayLesson,
+           lesson.orderIndex == node.order || lesson.id == node.id {
+            openLesson(lesson)
+            return
+        }
+
+        pendingOpenLessonOrder = node.order
+        appState.refreshTodayLesson()
     }
 
     private func isCompleted(_ summary: LessonSummary) -> Bool {

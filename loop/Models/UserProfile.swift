@@ -45,6 +45,10 @@ enum Weekday: String, Codable, CaseIterable, Identifiable {
 enum ProgrammingLanguage: String, Codable, CaseIterable, Identifiable {
     case python = "Python"
     case javascript = "JavaScript"
+    case typescript = "TypeScript"
+    case swift = "Swift"
+    case kotlin = "Kotlin"
+    case go = "Go"
     case html = "HTML"
     var id: String { rawValue }
 }
