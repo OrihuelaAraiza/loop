@@ -422,6 +422,24 @@ final class AppState: ObservableObject {
         persistCustomRoutes()
     }
 
+    private func ensureCustomRouteTracked(for course: CourseStatusPayload) {
+        if customRoutes.contains(where: { $0.backendCourseID == course.id }) {
+            return
+        }
+
+        let language = ProgrammingLanguage(rawValue: course.language) ?? .python
+        let request = CourseGenerationRequest(language: language).normalized()
+        let status: CustomRouteStatus = course.shouldPresentGeneratingState ? .generating : .active
+        let record = CustomRouteRecord(
+            request: request,
+            backendCourseID: course.id,
+            courseSnapshot: RouteCourseSnapshot(payload: course),
+            status: status
+        )
+        customRoutes.append(record)
+        persistCustomRoutes()
+    }
+
     private func reconcileCustomRoutes(with course: CourseStatusPayload?) {
         guard !customRoutes.isEmpty else { return }
 
@@ -523,6 +541,7 @@ final class AppState: ObservableObject {
                 self.todayLesson = today.lesson
                 if let course = resolvedCourse {
                     self.currentCourse = course
+                    self.ensureCustomRouteTracked(for: course)
                 }
                 self.reconcileCustomRoutes(with: resolvedCourse)
                 self.isLoadingTodayLesson = false
@@ -602,7 +621,7 @@ struct OnboardingAPIClient {
         let payload = OnboardingPayload.from(profile: profile, wantsPlacementTest: wantsPlacementTest)
         request.httpBody = try JSONEncoder().encode(payload)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (_, response) = try await LoopAPISession.perform(request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200 ... 299).contains(httpResponse.statusCode) else {
@@ -612,12 +631,12 @@ struct OnboardingAPIClient {
 
     fileprivate func logout(token: String) async throws {
         let request = makeRequest(path: "auth/logout", method: "DELETE", token: token)
-        _ = try await URLSession.shared.data(for: request)
+        _ = try await LoopAPISession.perform(request)
     }
 
     fileprivate func fetchMe(token: String) async throws -> MeResponsePayload {
         let request = makeRequest(path: "me", method: "GET", token: token)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await LoopAPISession.perform(request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200 ... 299).contains(httpResponse.statusCode) else {
@@ -629,7 +648,7 @@ struct OnboardingAPIClient {
 
     fileprivate func fetchCurrentCourse(token: String) async throws -> CurrentCourseResponsePayload {
         let request = makeRequest(path: "courses/current", method: "GET", token: token)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await LoopAPISession.perform(request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200 ... 299).contains(httpResponse.statusCode) else {
@@ -648,7 +667,7 @@ struct OnboardingAPIClient {
             request.httpBody = try JSONEncoder().encode(GenerateCourseRequestPayload.from(customRequest))
         }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await LoopAPISession.perform(request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200 ... 299).contains(httpResponse.statusCode) else {
@@ -660,7 +679,7 @@ struct OnboardingAPIClient {
 
     fileprivate func fetchTodayLesson(token: String) async throws -> TodayLessonResponsePayload {
         let request = makeRequest(path: "lessons/today", method: "GET", token: token)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await LoopAPISession.perform(request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200 ... 299).contains(httpResponse.statusCode) else {
@@ -672,7 +691,7 @@ struct OnboardingAPIClient {
 
     func completeLesson(token: String, lessonID: String) async throws -> CompleteLessonResponsePayload {
         let request = makeRequest(path: "lessons/\(lessonID)/complete", method: "POST", token: token)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await LoopAPISession.perform(request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200 ... 299).contains(httpResponse.statusCode) else {

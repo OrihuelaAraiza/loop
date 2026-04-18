@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import loop
 
+@MainActor
 struct LessonTheoryMapperTests {
     @Test func mapsFlatBackendLessonIntoMicrolearningSteps() throws {
         let json = """

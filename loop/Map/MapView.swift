@@ -150,19 +150,19 @@ struct MapView: View {
     private var courseEntries: [MapCourseEntry] {
         var entries: [MapCourseEntry] = []
         let currentID = appState.currentCourse?.id
-        let activeCustomRouteID = appState.customRoutes.first(where: { $0.status == .active })?.id
+        let currentTrackedInRoutes = currentID.map { id in
+            appState.customRoutes.contains(where: { $0.backendCourseID == id })
+        } ?? false
 
-        if let current = appState.currentCourse {
-            if activeCustomRouteID == nil {
-                entries.append(MapCourseEntry(
-                    id: current.id,
-                    title: current.resolvedTitle,
-                    language: current.language,
-                    mapStatus: current.shouldPresentGeneratingState ? .generating : .active,
-                    coursePayload: current,
-                    courseSnapshot: RouteCourseSnapshot(payload: current)
-                ))
-            }
+        if let current = appState.currentCourse, !currentTrackedInRoutes {
+            entries.append(MapCourseEntry(
+                id: current.id,
+                title: current.resolvedTitle,
+                language: current.language,
+                mapStatus: current.shouldPresentGeneratingState ? .generating : .active,
+                coursePayload: current,
+                courseSnapshot: RouteCourseSnapshot(payload: current)
+            ))
         }
 
         for route in appState.customRoutes {

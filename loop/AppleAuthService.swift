@@ -144,7 +144,7 @@ private struct AuthAPIClient {
         request.setValue("LoopiOS/1.0", forHTTPHeaderField: "User-Agent")
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await LoopAPISession.perform(request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AuthAPIError(message: "No se recibió respuesta del servidor.")

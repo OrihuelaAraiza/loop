@@ -40,7 +40,11 @@ struct RoutesView: View {
     private var carouselItems: [RouteCarouselItem] {
         var items: [RouteCarouselItem] = []
 
-        if let currentCourse {
+        let currentInRoutes = currentCourse.map { current in
+            createdRoutes.contains { $0.backendCourseID == current.id }
+        } ?? false
+
+        if let currentCourse, !currentInRoutes {
             items.append(
                 RouteCarouselItem(
                     id: "focus-\(currentCourse.id)",
@@ -59,14 +63,15 @@ struct RoutesView: View {
         }
 
         items += createdRoutes.map { route in
-            RouteCarouselItem(
+            let isFocus = route.status == .active && route.backendCourseID == currentCourse?.id
+            return RouteCarouselItem(
                 id: route.id,
-                kind: .created,
+                kind: isFocus ? .focus : .created,
                 title: route.title,
                 subtitle: route.subtitle,
                 language: route.request.language,
                 frameworkName: route.request.frameworkName,
-                status: route.status.displayStatus,
+                status: isFocus ? .focus : route.status.displayStatus,
                 progress: progress(for: route),
                 moduleLabel: moduleLabel(for: route),
                 difficultyStars: route.request.level?.stars ?? 1,

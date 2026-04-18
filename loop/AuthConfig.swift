@@ -64,3 +64,79 @@ enum AuthConfig {
         return trimmed.isEmpty ? nil : trimmed
     }
 }
+
+enum LoopAPISession {
+    private static let lock = NSLock()
+    private static var _session: URLSession = makeSession()
+    private static var consecutiveTransportFailures = 0
+    private static let failureThreshold = 3
+
+    static func perform(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        let currentSession = snapshotSession()
+        let start = Date()
+        let method = request.httpMethod ?? "GET"
+        let path = request.url?.path ?? ""
+
+        do {
+            let result = try await currentSession.data(for: request)
+            let ms = Int(Date().timeIntervalSince(start) * 1000)
+            if let http = result.1 as? HTTPURLResponse {
+                #if DEBUG
+                print("[API] \(method) \(path) → \(http.statusCode) (\(ms)ms)")
+                #endif
+            }
+            recordTransportSuccess()
+            return result
+        } catch {
+            let ms = Int(Date().timeIntervalSince(start) * 1000)
+            #if DEBUG
+            print("[API] \(method) \(path) → ERROR \(error.localizedDescription) (\(ms)ms)")
+            #endif
+            if error is URLError {
+                recordTransportFailure()
+            }
+            throw error
+        }
+    }
+
+    private static func snapshotSession() -> URLSession {
+        lock.lock(); defer { lock.unlock() }
+        return _session
+    }
+
+    private static func recordTransportSuccess() {
+        lock.lock(); defer { lock.unlock() }
+        consecutiveTransportFailures = 0
+    }
+
+    private static func recordTransportFailure() {
+        lock.lock()
+        consecutiveTransportFailures += 1
+        let shouldReset = consecutiveTransportFailures >= failureThreshold
+        if shouldReset {
+            consecutiveTransportFailures = 0
+        }
+        let staleSession = shouldReset ? _session : nil
+        if shouldReset {
+            _session = makeSession()
+        }
+        lock.unlock()
+
+        if let staleSession {
+            #if DEBUG
+            print("[API] resetting URLSession after \(failureThreshold) consecutive transport failures")
+            #endif
+            staleSession.invalidateAndCancel()
+        }
+    }
+
+    private static func makeSession() -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        config.waitsForConnectivity = false
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.httpMaximumConnectionsPerHost = 4
+        return URLSession(configuration: config)
+    }
+}

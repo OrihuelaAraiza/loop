@@ -3,7 +3,16 @@
     "allow": [
       "Bash(find /Users/JP/Desktop/loop/loop -name \"*.swift\" ! -path \"*/.claude/*\" -exec grep -l \"Color\\\\.\" {} \\\\;)",
       "Bash(cat)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(xcodebuild -project loop.xcodeproj -scheme loop -destination 'platform=iOS Simulator,name=iPhone 16' -quiet build)",
+      "Read(//Applications/**)",
+      "Bash(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project /Users/JP/Desktop/loop/loop.xcodeproj -scheme loop -destination 'platform=iOS Simulator,name=iPhone 16' -quiet build)",
+      "Bash(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project /Users/JP/Desktop/loop/loop.xcodeproj -scheme loop -destination 'platform=iOS Simulator,name=iPhone 17' -quiet build)",
+      "Bash(DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project /Users/JP/Desktop/loop/loop.xcodeproj -scheme loop -destination 'platform=iOS Simulator,name=iPhone 17' build)",
+      "Bash(find /Users/JP/Desktop/loop/loop.xcodeproj -name \"*.xcscheme\" -exec grep -H \"LOOP_API\\\\|environmentVariables\" {} \\\\;)",
+      "Bash(curl -sI -m 5 https://hackly-nonsynchronical-waylon.ngrok-free.dev/api/healthz)",
+      "Bash(curl -s -m 5 -X POST https://hackly-nonsynchronical-waylon.ngrok-free.dev/api/courses/generate -H \"Content-Type: application/json\" -H \"ngrok-skip-browser-warning: true\" -o /tmp/resp.txt -w \"status=%{http_code}\\\\ntime=%{time_total}s\\\\n\")",
+      "Bash(curl -s -m 3 https://hackly-nonsynchronical-waylon.ngrok-free.dev/__TRACKED_VAR__ -H 'ngrok-skip-browser-warning: true' -o /dev/null -w 'status=%{http_code}\\\\n')"
     ],
     "additionalDirectories": [
       "/Users/JP/.claude/projects/-Users-JP-Desktop-loop/memory"

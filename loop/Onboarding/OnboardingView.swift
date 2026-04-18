@@ -5,7 +5,6 @@ import Combine
 struct OnboardingFlow: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = OnboardingViewModel()
-    private let stepLabels = ["Inicio", "Perfil", "Edad", "Objetivo", "Nivel", "Rutina", "Plan"]
 
     var body: some View {
         ZStack {
@@ -51,7 +50,7 @@ struct OnboardingFlow: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text(stepLabels[viewModel.step].uppercased())
+                    Text(viewModel.currentStep.rawValue.uppercased())
                         .font(LoopFont.bold(10))
                         .foregroundColor(.periwinkle)
 
@@ -75,20 +74,22 @@ struct OnboardingFlow: View {
 
     @ViewBuilder
     private var stepContent: some View {
-        switch viewModel.step {
-        case 0:
+        switch viewModel.currentStep {
+        case .welcome:
             OnboardingWelcomeView(next: viewModel.next)
-        case 1:
+        case .name:
             OnboardingNameView(viewModel: viewModel)
-        case 2:
+        case .age:
             OnboardingAgeView(viewModel: viewModel)
-        case 3:
+        case .goal:
             OnboardingGoalView(viewModel: viewModel)
-        case 4:
+        case .level:
             OnboardingLevelView(viewModel: viewModel)
-        case 5:
+        case .placement:
+            OnboardingPlacementTestView(viewModel: viewModel)
+        case .time:
             OnboardingTimeView(viewModel: viewModel)
-        default:
+        case .plan:
             OnboardingPlanView(
                 viewModel: viewModel,
                 finish: {
@@ -914,6 +915,13 @@ private struct OnboardingGoalView: View {
 private struct OnboardingLevelView: View {
     @ObservedObject var viewModel: OnboardingViewModel
 
+    private var placementBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.wantsPlacementTest },
+            set: { viewModel.setPlacementTestEnabled($0) }
+        )
+    }
+
     var body: some View {
         OnboardingContainer(title: "Nivel actual", subtitle: "Selecciona tu punto de partida real.", eyebrow: "Nivel") {
             VStack(spacing: Spacing.sm) {
@@ -1008,7 +1016,7 @@ private struct OnboardingLevelView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: Spacing.sm)
-                LoopPlacementToggle(isOn: $viewModel.wantsPlacementTest)
+                LoopPlacementToggle(isOn: placementBinding)
             }
         }
         .loopCloudMotion(viewModel.wantsPlacementTest)
@@ -1066,6 +1074,150 @@ private struct OnboardingLevelView: View {
         case .hasPractice:
             return "bolt.fill"
         }
+    }
+}
+
+private struct OnboardingPlacementTestView: View {
+    @ObservedObject var viewModel: OnboardingViewModel
+    private let optionLetters = ["A", "B", "C", "D"]
+
+    var body: some View {
+        OnboardingContainer(
+            title: "Mini test de placement",
+            subtitle: "Responde estas 3 preguntas para ajustar mejor el punto de partida.",
+            eyebrow: "Placement"
+        ) {
+            LoopCard(accentColor: .loopGold, showsSceneAccent: true) {
+                HStack(alignment: .center, spacing: Spacing.md) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Progreso")
+                            .font(LoopFont.semiBold(13))
+                            .foregroundColor(.textSecond)
+                        Text("\(viewModel.placementAnswers.count)/\(viewModel.placementQuestions.count) respondidas")
+                            .font(LoopFont.bold(18))
+                            .foregroundColor(.textPrimary)
+                            .contentTransition(.numericText())
+                    }
+
+                    Spacer()
+
+                    if let level = viewModel.placementResultLevel() {
+                        OnboardingMiniPill(
+                            icon: "sparkles",
+                            text: "Nivel estimado: \(level.rawValue)",
+                            tint: .loopGold
+                        )
+                    } else {
+                        OnboardingMiniPill(
+                            icon: "bolt.fill",
+                            text: "Sincronizando tu nivel real",
+                            tint: .loopGold
+                        )
+                    }
+                }
+            }
+
+            VStack(spacing: Spacing.lg) {
+                ForEach(Array(viewModel.placementQuestions.enumerated()), id: \.element.id) { index, question in
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        HStack(spacing: 8) {
+                            Text("Pregunta \(index + 1)")
+                                .font(LoopFont.bold(12))
+                                .foregroundColor(.loopGold)
+                                .padding(.horizontal, Spacing.md)
+                                .padding(.vertical, 6)
+                                .background(Color.loopGold.opacity(0.12))
+                                .clipShape(Capsule())
+
+                            Text(question.title)
+                                .font(LoopFont.semiBold(13))
+                                .foregroundColor(.textSecond)
+                        }
+
+                        LoopCard(accentColor: .loopGold.opacity(0.65)) {
+                            VStack(alignment: .leading, spacing: Spacing.md) {
+                                Text(question.prompt)
+                                    .font(LoopFont.semiBold(15))
+                                    .foregroundColor(.textPrimary)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                VStack(spacing: Spacing.sm) {
+                                    ForEach(Array(question.options.enumerated()), id: \.element.id) { optionIndex, option in
+                                        placementOptionRow(
+                                            question: question,
+                                            option: option,
+                                            optionIndex: optionIndex
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if let level = viewModel.placementResultLevel() {
+                LoopCard(accentColor: .mint) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Resultado estimado")
+                            .font(LoopFont.bold(14))
+                            .foregroundColor(.textPrimary)
+                        Text("Tu punto de partida sugerido es \(level.rawValue). Si después quieres cambiarlo, siempre podrás ajustar el plan.")
+                            .font(LoopFont.regular(13))
+                            .foregroundColor(.textSecond)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            LoopCTA(title: "Continuar", trailingIcon: "arrow.right", style: .solid(.coral)) {
+                HapticManager.shared.success()
+                viewModel.completePlacementTest()
+                viewModel.next()
+            }
+            .disabled(!viewModel.hasCompletedPlacementTest)
+            .opacity(viewModel.hasCompletedPlacementTest ? 1 : 0.55)
+        }
+    }
+
+    private func placementOptionRow(
+        question: PlacementQuestion,
+        option: PlacementQuestion.Option,
+        optionIndex: Int
+    ) -> some View {
+        let isSelected = viewModel.selectedPlacementOptionID(for: question.id) == option.id
+
+        return Button {
+            HapticManager.shared.selection()
+            withAnimation(LoopAnimation.springFast) {
+                viewModel.answerPlacementQuestion(question.id, with: option.id)
+            }
+        } label: {
+            OnboardingSelectableCard(isSelected: isSelected, tint: .loopGold) {
+                HStack(spacing: Spacing.md) {
+                    Text(optionLetters[optionIndex])
+                        .font(LoopFont.bold(13))
+                        .foregroundColor(isSelected ? .loopGold : .periwinkle)
+                        .frame(width: 28, height: 28)
+                        .background(isSelected ? Color.loopGold.opacity(0.16) : Color.loopSurf3)
+                        .clipShape(Circle())
+
+                    Text(option.text)
+                        .font(LoopFont.semiBold(14))
+                        .foregroundColor(.textPrimary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .multilineTextAlignment(.leading)
+
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.loopGold)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 
